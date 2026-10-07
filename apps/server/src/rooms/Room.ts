@@ -83,6 +83,8 @@ export class Room {
     this.clampBots();
     this.broadcastState();
     this.notice(`${name.toUpperCase()} JOINED`);
+    // Joining mid-match: spectate now, play from the next match.
+    this.runner?.sendJoin(id);
   }
 
   reconnect(id: string, socketId: string, name?: string): void {

@@ -1,0 +1,12 @@
+# Render blueprint: one web service that serves the game client and the Socket.IO server.
+services:
+  - type: web
+    name: blind-shot
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20

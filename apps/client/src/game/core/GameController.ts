@@ -181,7 +181,8 @@ export class GameController {
     }
 
     const local = this.roster.get(this.session.localId);
-    const spectating = !!local && (!local.inRound || !local.alive) && view.phase !== 'ROUND_INTRO' && view.phase !== 'SPAWN';
+    // Not in the roster at all = joined mid-match as a spectator.
+    const spectating = !local || ((!local.inRound || !local.alive) && view.phase !== 'ROUND_INTRO' && view.phase !== 'SPAWN');
     if (spectating !== hudStore.get().spectating && !this.dying.has(this.session.localId)) {
       hudStore.set({ spectating });
       this.world.cameraRig.mode = spectating ? 'spectate' : 'player';

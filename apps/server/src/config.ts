@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-export const PORT = Number(process.env.PORT ?? 3001);
+/** BLINDSHOT_PORT wins over PORT so tooling that sets PORT for the client dev server cannot clash. */
+export const PORT = Number(process.env.BLINDSHOT_PORT ?? process.env.PORT ?? 3001);
 
 /** Comma-separated list of allowed browser origins, or "*" (default) for any. */
 export const CORS_ORIGIN: string | string[] = (() => {
