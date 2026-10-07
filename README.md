@@ -214,10 +214,11 @@ Next:
 
 ## Asset credits
 
-Every model, texture, sound and visual effect is **original and generated in code**. Nothing is copied from another game.
+Every model, texture and visual effect is **original and generated in code**, and all sounds are either synthesised or CC0 recordings. Nothing is copied from another game.
 
 * **3D models:** procedural (`SubjectModel`, `GunModel`, `TestChamber`) built from Three.js primitives.
 * **Textures:** drawn at runtime with Canvas 2D (`characters/textures.ts`, `maps/arenaTextures.ts`).
-* **Audio:** synthesised at runtime with the Web Audio API (`audio/AudioEngine.ts`). If recorded gunshot files exist at `apps/client/public/sfx/gunshot-1.ogg` (and `-2`, `-3`), they are used instead of the synthesized shot.
+* **Gunshots:** real recordings from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library) (CC0 1.0, public domain): single shots from the 1911 (takes A_42P, A_34P) and Smith & Wesson 642 (take V_22P), trimmed, mono, 44.1 kHz. Stored in `apps/client/public/sfx/` with a `LICENSE.txt`. The synthesized shot is only a fallback if the files fail to load.
+* **Other audio:** synthesised at runtime with the Web Audio API (`audio/AudioEngine.ts`).
 * **Fonts:** [Anton](https://fonts.google.com/specimen/Anton) by Vernon Adams and [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) by Jeremy Tribby, both under the SIL Open Font License 1.1, bundled via `@fontsource`.
 * **Libraries:** Three.js (MIT), Rapier (Apache-2.0), React (MIT), Socket.IO (MIT), Vite (MIT).

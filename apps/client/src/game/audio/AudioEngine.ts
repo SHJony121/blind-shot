@@ -15,7 +15,7 @@ export class AudioEngine {
   private noiseBuffer!: AudioBuffer;
   private drone: { stop: () => void } | null = null;
   private volumes = { master: 0.8, sfx: 0.9, music: 0.5 };
-  /** Recorded gunshot samples (public/sfx/gunshot-*.ogg). Synthesis is the fallback. */
+  /** Recorded gunshot samples (public/sfx/gunshot-*.wav, CC0). Synthesis is the fallback. */
   private shotSamples: AudioBuffer[] = [];
 
   /** Must be called from a user gesture (browser autoplay policy). */
@@ -141,15 +141,15 @@ export class AudioEngine {
     const panner = ctx.createStereoPanner();
     panner.pan.value = Math.max(-1, Math.min(1, pan));
     src.connect(gain).connect(panner);
+    // The recordings already carry their own outdoor/range tail, so no extra reverb here.
     panner.connect(this.sfx);
-    panner.connect(this.reverbSend);
     src.start(t);
     // A little extra low end so the shot thumps on laptop speakers too.
     const sub = ctx.createOscillator();
     sub.frequency.setValueAtTime(90, t);
     sub.frequency.exponentialRampToValueAtTime(35, t + 0.3);
     const subGain = ctx.createGain();
-    subGain.gain.setValueAtTime(0.9 * gain.gain.value, t);
+    subGain.gain.setValueAtTime(0.45 * gain.gain.value, t);
     subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
     sub.connect(subGain).connect(panner);
     sub.start(t);
@@ -162,7 +162,7 @@ export class AudioEngine {
     const takes: AudioBuffer[] = [];
     for (let i = 1; i <= 3; i++) {
       try {
-        const res = await fetch(`${import.meta.env.BASE_URL}sfx/gunshot-${i}.ogg`);
+        const res = await fetch(`${import.meta.env.BASE_URL}sfx/gunshot-${i}.wav`);
         if (!res.ok) continue;
         takes.push(await ctx.decodeAudioData(await res.arrayBuffer()));
       } catch {

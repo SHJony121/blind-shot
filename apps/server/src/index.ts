@@ -18,6 +18,7 @@ const MIME: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.wasm': 'application/wasm',
+  '.wav': 'audio/wav',
   '.ico': 'image/x-icon',
 };
 
