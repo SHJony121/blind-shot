@@ -1,4 +1,5 @@
 import { SUBJECT_COLORS } from '@blindshot/shared';
+import { settingsStore } from '../../state/settings';
 import { SubjectModel } from '../characters/SubjectModel';
 import type { ClientWorld } from './ClientWorld';
 
@@ -16,17 +17,36 @@ export class MenuDirector {
 
   constructor(private readonly world: ClientWorld) {}
 
+  private unsubSkin: (() => void) | null = null;
+  private skin = settingsStore.get().skin;
+
   start(): void {
     if (this.hero) return;
-    this.hero = new SubjectModel({ bodyColor: SUBJECT_COLORS[0], accentColor: SUBJECT_COLORS[0], subject: 1 });
-    this.hero.root.position.set(0, 0, 3.4);
-    this.world.engine.scene.add(this.hero.root);
+    this.spawnHero();
+    // Re-dress the hero live when the character picker changes.
+    this.unsubSkin = settingsStore.subscribe(() => {
+      const skin = settingsStore.get().skin;
+      if (skin === this.skin || !this.hero) return;
+      this.skin = skin;
+      this.hero.dispose();
+      this.spawnHero();
+      this.hero.spawnDrop();
+    });
     this.world.cameraRig.mode = 'menu';
     this.world.chamber.setMood('menu');
     this.stopUpdate = this.world.addUpdate((dt) => this.update(dt));
   }
 
+  private spawnHero(): void {
+    this.skin = settingsStore.get().skin;
+    this.hero = new SubjectModel({ bodyColor: SUBJECT_COLORS[0], accentColor: SUBJECT_COLORS[0], subject: 1, skin: this.skin });
+    this.hero.root.position.set(0, 0, 3.4);
+    this.world.engine.scene.add(this.hero.root);
+  }
+
   stop(): void {
+    this.unsubSkin?.();
+    this.unsubSkin = null;
     this.stopUpdate?.();
     this.stopUpdate = null;
     this.hero?.dispose();

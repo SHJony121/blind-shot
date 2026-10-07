@@ -9,7 +9,7 @@ export interface SoloChoice {
   config: MatchConfig;
 }
 
-const KEY = 'blindshot.solo.v2';
+const KEY = 'blindshot.solo.v3';
 
 function loadChoice(): SoloChoice {
   const base: SoloChoice = { bots: 3, difficulty: 'NORMAL', config: { ...DEFAULT_MATCH_CONFIG } };
@@ -86,10 +86,10 @@ export function SoloSetup({ onStart }: { onStart: (c: SoloChoice) => void }) {
           />
         </Field>
         <Field label="VISIBLE PHASE">
-          <Slider value={cfg.visibleSeconds} min={3} max={8} step={0.5} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
+          <Slider value={cfg.visibleSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
         </Field>
         <Field label="HIDDEN COUNTDOWN">
-          <Slider value={cfg.blindSeconds} min={3} max={8} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
+          <Slider value={cfg.blindSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
         </Field>
         <Field label="MAP">
           <Seg

@@ -40,6 +40,17 @@ export class CameraRig {
     this.camera.lookAt(this.look);
   }
 
+  /**
+   * Inspect mode (after the freeze): the player can zoom toward a point and orbit around
+   * it to check whether a laser really lines up with a target. Eases back when disabled.
+   */
+  readonly inspect = { enabled: false, zoom: 1, yaw: 0, pitch: 0, focus: null as Vec2 | null };
+  private zoomS = 1;
+  private yawS = 0;
+  private pitchS = 0;
+  private focusS = new THREE.Vector3();
+  private focusW = 0;
+
   /** Arena half extents, used to frame the floor. */
   bounds = { x: 14, z: 14 };
 
@@ -60,17 +71,19 @@ export class CameraRig {
       const height = 7 + bz * 1.0;
       tmpPos.set(fx, height, fz - bz * 0.8 - 3);
       tmpLook.set(fx, 0, fz - bz * 0.2);
-      if (aimPoint) {
+      if (aimPoint && !this.inspect.enabled) {
         tmpLook.x += (aimPoint.x - tmpLook.x) * 0.08 * this.sway;
         tmpLook.z += (aimPoint.z - tmpLook.z) * 0.08 * this.sway;
       }
-      this.damp(tmpPos, tmpLook, dt, 5);
+      this.applyInspect(dt);
+      this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 5);
     } else if (this.mode === 'spectate') {
       this.orbit += dt * 0.05;
       const r = Math.max(bx, bz) * 0.35;
       tmpPos.set(Math.sin(this.orbit) * r, 17 + bz * 0.7, -bz - 4 + Math.cos(this.orbit) * r * 0.3);
       tmpLook.set(0, 0, 1.5);
-      this.damp(tmpPos, tmpLook, dt, 2);
+      this.applyInspect(dt);
+      this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 2);
     } else {
       // Menu: slow drift around the hero subject standing in front of the pillars.
       this.menuT += dt;
@@ -80,6 +93,34 @@ export class CameraRig {
     }
     this.camera.position.copy(this.pos).add(shake);
     this.camera.lookAt(this.look);
+  }
+
+  /** Bend the standard camera target by the inspect zoom / orbit (smoothed). */
+  private applyInspect(dt: number): void {
+    const i = this.inspect;
+    const k = 1 - Math.exp(-10 * dt);
+    const on = i.enabled;
+    this.zoomS += ((on ? i.zoom : 1) - this.zoomS) * k;
+    this.yawS += ((on ? i.yaw : 0) - this.yawS) * k;
+    this.pitchS += ((on ? i.pitch : 0) - this.pitchS) * k;
+    const wantW = on && i.focus ? 1 - Math.min(1, this.zoomS) : 0;
+    this.focusW += (wantW - this.focusW) * k;
+    if (i.focus) this.focusS.set(i.focus.x, 0, i.focus.z);
+    // Look point slides toward the inspected spot as you zoom in.
+    tmpLook.lerp(this.focusS, this.focusW);
+    // Orbit + zoom: rotate the offset around the look point, then scale it.
+    const off = tmpPos.clone().sub(tmpLook);
+    off.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawS);
+    const horiz = Math.hypot(off.x, off.z);
+    const elev = Math.atan2(off.y, horiz) + this.pitchS;
+    const len = off.length() * this.zoomS;
+    const clampedElev = Math.max(0.2, Math.min(1.45, elev));
+    const dirXZ = horiz > 1e-6 ? { x: off.x / horiz, z: off.z / horiz } : { x: 0, z: -1 };
+    tmpPos.set(
+      tmpLook.x + dirXZ.x * Math.cos(clampedElev) * len,
+      tmpLook.y + Math.sin(clampedElev) * len,
+      tmpLook.z + dirXZ.z * Math.cos(clampedElev) * len,
+    );
   }
 
   private damp(pos: THREE.Vector3, look: THREE.Vector3, dt: number, rate: number): void {

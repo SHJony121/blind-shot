@@ -6,6 +6,7 @@ import {
   type MatchConfig,
   type PlayerInput,
   type PlayerSeed,
+  type SkinId,
 } from '@blindshot/shared';
 import type { GameSession, SessionListener } from './GameSession';
 
@@ -13,6 +14,7 @@ const BOT_NAMES = ['Rivet', 'Sprocket', 'Gauge', 'Widget', 'Piston', 'Valve', 'R
 
 export interface SoloOptions {
   name: string;
+  skin?: SkinId;
   bots: number;
   difficulty: BotDifficulty;
   config: MatchConfig;
@@ -30,7 +32,7 @@ export class LocalSession implements GameSession {
 
   constructor(opts: SoloOptions) {
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    const seeds: PlayerSeed[] = [{ id: this.localId, name: opts.name, isBot: false, isHost: true }];
+    const seeds: PlayerSeed[] = [{ id: this.localId, name: opts.name, skin: opts.skin, isBot: false, isHost: true }];
     for (let i = 0; i < opts.bots; i++) {
       seeds.push({ id: `bot${i + 1}`, name: names[i] ?? `Bot ${i + 1}`, isBot: true, botDifficulty: opts.difficulty });
     }

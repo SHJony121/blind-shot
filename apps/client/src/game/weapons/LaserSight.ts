@@ -21,6 +21,7 @@ export class LaserSight {
   private opacity = 0;
   private targetOpacity = 0;
   private pulse = Math.random() * 10;
+  private brightScale = 1;
 
   constructor(color: THREE.ColorRepresentation) {
     this.coreMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -34,6 +35,17 @@ export class LaserSight {
     this.dot.renderOrder = 6;
     this.group.add(this.core, this.glow, this.dot);
     this.group.visible = false;
+  }
+
+  /** On bright floors additive light vanishes: draw solid, saturated beams instead. */
+  setBright(bright: boolean): void {
+    const blending = bright ? THREE.NormalBlending : THREE.AdditiveBlending;
+    for (const m of [this.coreMat, this.glowMat, this.dotMat]) {
+      m.blending = blending;
+      m.needsUpdate = true;
+    }
+    this.coreMat.color.set(bright ? this.glowMat.color.clone().multiplyScalar(0.75) : '#ffffff');
+    this.brightScale = bright ? 1.6 : 1;
   }
 
   setColor(color: THREE.ColorRepresentation): void {
@@ -75,8 +87,8 @@ export class LaserSight {
     const dotSize = hit.surface === 'SUBJECT' ? 0.75 : 0.45;
     this.dot.scale.setScalar(dotSize * (0.9 + Math.random() * 0.2));
 
-    this.coreMat.opacity = this.opacity * 0.9 * flicker;
-    this.glowMat.opacity = this.opacity * 0.55 * flicker;
+    this.coreMat.opacity = Math.min(1, this.opacity * 0.9 * flicker * this.brightScale);
+    this.glowMat.opacity = Math.min(1, this.opacity * 0.55 * flicker * (this.brightScale > 1 ? 0.6 : 1));
     this.dotMat.opacity = this.opacity;
   }
 

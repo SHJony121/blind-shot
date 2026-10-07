@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { NAME_MAX_LENGTH, sanitizeName } from '@blindshot/shared';
+import { NAME_MAX_LENGTH, SKINS, sanitizeName } from '@blindshot/shared';
+import { SKIN_LABELS } from '../../game/characters/SubjectModel';
 import { audio } from '../../game/audio/AudioEngine';
 import { go } from '../../game/GameApp';
 import { net } from '../../networking/NetClient';
@@ -18,6 +19,14 @@ export function MainMenu({ onQuickPlay }: { onQuickPlay: () => Promise<string | 
     setName(clean);
     settingsStore.set({ name: clean });
     return clean;
+  };
+
+  const cycleSkin = (dir: number) => {
+    audio.unlock();
+    audio.uiClick();
+    const i = SKINS.indexOf(settings.skin);
+    const next = SKINS[(i + dir + SKINS.length) % SKINS.length] ?? 'DUMMY';
+    settingsStore.set({ skin: next });
   };
 
   const quickPlay = async () => {
@@ -56,6 +65,17 @@ export function MainMenu({ onQuickPlay }: { onQuickPlay: () => Promise<string | 
           aria-label="Your name"
         />
       </label>
+
+      <div className="skin-picker">
+        <span className="tag-label">LOOK</span>
+        <button type="button" aria-label="Previous character" onClick={() => cycleSkin(-1)}>
+          ◀
+        </button>
+        <span className="skin-name">{SKIN_LABELS[settings.skin]}</span>
+        <button type="button" aria-label="Next character" onClick={() => cycleSkin(1)}>
+          ▶
+        </button>
+      </div>
 
       <div className="menu-buttons">
         <Button variant="primary" disabled={busy} onClick={quickPlay}>

@@ -99,9 +99,20 @@ function tiled(tex: THREE.Texture, rx: number, ry: number): THREE.Texture {
 }
 
 /** One 4 m floor tile per texture repeat. */
-export function floorTexture(theme: 'chamber' | 'factory' | 'cooling', rx: number, ry: number): THREE.Texture {
+export function floorTexture(theme: 'clean' | 'chamber' | 'factory' | 'cooling', rx: number, ry: number): THREE.Texture {
   const base = canvasTexture(`floor-${theme}`, 512, 512, (g) => {
-    if (theme === 'chamber') {
+    if (theme === 'clean') {
+      // Bright 2 m checker: easy to judge distances and positions at a glance.
+      for (let y = 0; y < 2; y++) {
+        for (let x = 0; x < 2; x++) {
+          g.fillStyle = (x + y) % 2 === 0 ? '#f6f7f9' : '#e4e8ec';
+          g.fillRect(x * 256, y * 256, 256, 256);
+        }
+      }
+      g.strokeStyle = 'rgba(150,160,170,0.35)';
+      g.lineWidth = 2;
+      g.strokeRect(1, 1, 510, 510);
+    } else if (theme === 'chamber') {
       g.fillStyle = '#3a4148';
       g.fillRect(0, 0, 512, 512);
       g.fillStyle = 'rgba(255,255,255,0.05)';
@@ -267,4 +278,20 @@ export function emblemTexture(label: string, color: string): THREE.Texture {
     g.textBaseline = 'middle';
     g.fillText(label, 256, 266);
   });
+}
+
+export function cleanWallTexture(_label: string, repeat: number): THREE.Texture {
+  const tex = canvasTexture('wall-clean', 512, 128, (g) => {
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 512, 128);
+    g.fillStyle = '#d5dbe1';
+    g.fillRect(0, 108, 512, 20);
+    g.fillStyle = 'rgba(160,170,180,0.35)';
+    for (let x = 0; x < 512; x += 128) g.fillRect(x, 0, 3, 108);
+  });
+  const t = tex.clone();
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(repeat * 3, 1);
+  t.needsUpdate = true;
+  return t;
 }

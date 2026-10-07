@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getArena, TEST_CHAMBER_01, type ArenaDef, type MapId } from '@blindshot/shared';
+import { getArena, scaleArena, WHITE_ROOM, type ArenaDef, type MapId } from '@blindshot/shared';
 import { audio } from '../audio/AudioEngine';
 import { CameraRig } from '../camera/CameraRig';
 import { Effects } from '../effects/Effects';
@@ -18,7 +18,8 @@ const shakeTmp = new THREE.Vector3();
 export class ClientWorld {
   readonly engine: Engine;
   readonly input: Input;
-  arena: ArenaDef = TEST_CHAMBER_01;
+  arena: ArenaDef = WHITE_ROOM;
+  private arenaKey = 'WHITE_ROOM@1';
   chamber: ArenaView;
   readonly effects = new Effects();
   readonly cameraRig: CameraRig;
@@ -39,6 +40,8 @@ export class ClientWorld {
     this.chamber = new ArenaView(this.arena, this.engine.renderer);
     this.cameraRig = new CameraRig(this.engine.camera);
     this.engine.scene.add(this.chamber.group, this.effects.group);
+    this.chamber.applyEnvironment(this.engine.scene);
+    this.effects.setBright(this.chamber.bright);
 
     const applySettings = () => {
       const s = settingsStore.get();
@@ -61,13 +64,19 @@ export class ClientWorld {
     this.physics = new PhysicsWorld(this.rapier, this.arena);
   }
 
-  /** Swap the arena (visuals + ragdoll physics). Keeps lighting mood. */
-  setArena(id: MapId): void {
-    if (this.arena.id === id) return;
-    this.arena = getArena(id);
+  /** Swap the arena (visuals + ragdoll physics), optionally shrunk. */
+  setArena(id: MapId, scale = 1): void {
+    const key = `${id}@${scale.toFixed(3)}`;
+    if (key === this.arenaKey) return;
+    this.arenaKey = key;
+    const mood = this.chamber.currentMood;
+    this.arena = scaleArena(getArena(id), scale);
     this.chamber.dispose();
     this.chamber = new ArenaView(this.arena, this.engine.renderer);
     this.engine.scene.add(this.chamber.group);
+    this.chamber.applyEnvironment(this.engine.scene);
+    this.chamber.setMood(mood);
+    this.effects.setBright(this.chamber.bright);
     this.physics?.dispose();
     this.physics = this.rapier ? new PhysicsWorld(this.rapier, this.arena) : null;
     this.effects.clearDecals();

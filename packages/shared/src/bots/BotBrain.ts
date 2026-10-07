@@ -98,7 +98,7 @@ export class BotBrain {
     private readonly selfId: string,
     private readonly team: TeamId,
     difficulty: BotDifficulty,
-    private readonly arena: ArenaDef,
+    private readonly arenaOf: () => ArenaDef,
     private readonly rng: Rng,
   ) {
     this.profile = BOT_PROFILES[difficulty];
@@ -263,13 +263,13 @@ export class BotBrain {
 
   private lineBlocked(from: Vec2, to: Vec2): boolean {
     const dir = normalize(sub(to, from));
-    return castRay(this.arena, from, dir, []).distance < distance(from, to);
+    return castRay(this.arenaOf(), from, dir, []).distance < distance(from, to);
   }
 
   private randomPointNear(from: Vec2, radius: number): Vec2 {
     const a = this.rng.range(0, Math.PI * 2);
     const r = (0.4 + 0.6 * Math.sqrt(this.rng.next())) * radius;
     const d = yawToDir(a);
-    return resolveCollisions(this.arena, { x: from.x + d.x * r, z: from.z + d.z * r }, PLAYER_HIT_RADIUS * 2);
+    return resolveCollisions(this.arenaOf(), { x: from.x + d.x * r, z: from.z + d.z * r }, PLAYER_HIT_RADIUS * 2);
   }
 }

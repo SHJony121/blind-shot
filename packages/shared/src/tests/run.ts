@@ -106,7 +106,7 @@ test('a full bot match always terminates with a winner or a draw', () => {
     );
     sim.start();
     const events: MatchEvent[] = [];
-    for (let i = 0; i < 30 * 60 * 20 && !sim.finished; i++) {
+    for (let i = 0; i < 30 * 60 * 40 && !sim.finished; i++) {
       sim.tick(1 / 30);
       events.push(...sim.drainEvents());
     }

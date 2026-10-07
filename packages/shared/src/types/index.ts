@@ -1,4 +1,5 @@
 import type { Vec2 } from '../math/vec';
+import type { SkinId } from '../constants/game';
 
 export type Phase =
   | 'WAITING'
@@ -25,7 +26,7 @@ export type GameModeId = 'FFA' | 'TEAMS';
 /** SEQUENTIAL: subjects fire one by one in a random order (a subject shot first never fires).
  *  SIMULTANEOUS: everyone fires at once and mutual eliminations are possible. */
 export type FireOrder = 'SEQUENTIAL' | 'SIMULTANEOUS';
-export type MapId = 'TEST_CHAMBER_01' | 'FACTORY_FLOOR' | 'COOLING_ROOM';
+export type MapId = 'WHITE_ROOM' | 'TEST_CHAMBER_01' | 'FACTORY_FLOOR' | 'COOLING_ROOM';
 export type TeamId = 0 | 1 | 2;
 
 export interface MatchConfig {
@@ -66,6 +67,7 @@ export interface PlayerInfo {
   name: string;
   subject: number;
   colorIndex: number;
+  skin: SkinId;
   team: TeamId;
   isBot: boolean;
   botDifficulty: BotDifficulty | null;
@@ -102,6 +104,8 @@ export interface MatchView {
   bodies: BodyState[];
   teamWins: Record<number, number>;
   config: MatchConfig;
+  /** Current arena scale (the arena shrinks each round). */
+  arenaScale: number;
   /** Last processed input sequence for the viewer (for client reconciliation). */
   ackSeq: number;
 }
@@ -173,6 +177,7 @@ export interface PlayerSeed {
   isBot: boolean;
   botDifficulty?: BotDifficulty;
   isHost?: boolean;
+  skin?: SkinId;
   /** Optional explicit team (TEAMS mode). Assigned automatically when omitted. */
   team?: TeamId;
 }

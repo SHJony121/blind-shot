@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { sanitizeName } from '@blindshot/shared';
+import { isSkin, sanitizeName, type SkinId } from '@blindshot/shared';
 
 export interface PlayerRecord {
   id: string;
   token: string;
   name: string;
+  skin: SkinId;
   socketId: string | null;
   roomCode: string | null;
 }
@@ -18,11 +19,13 @@ export class PlayerRegistry {
   private readonly byId = new Map<string, PlayerRecord>();
 
   /** Resolve a hello: reuse the record behind a valid token, otherwise mint a new guest. */
-  identify(rawName: unknown, token: unknown, socketId: string): PlayerRecord {
+  identify(rawName: unknown, token: unknown, socketId: string, rawSkin?: unknown): PlayerRecord {
     const name = sanitizeName(rawName, 'Guest');
+    const skin: SkinId = isSkin(rawSkin) ? rawSkin : 'DUMMY';
     const existing = typeof token === 'string' ? this.byToken.get(token) : undefined;
     if (existing) {
       existing.name = name;
+      existing.skin = skin;
       existing.socketId = socketId;
       return existing;
     }
@@ -30,6 +33,7 @@ export class PlayerRegistry {
       id: randomUUID(),
       token: randomBytes(18).toString('base64url'),
       name,
+      skin,
       socketId,
       roomCode: null,
     };

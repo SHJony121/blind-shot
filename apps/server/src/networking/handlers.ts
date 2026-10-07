@@ -33,14 +33,14 @@ export function registerHandlers(io: BlindShotServer, rooms: RoomManager, player
       const rec = players.get(playerId as string)!;
       if (rec.roomCode && rec.roomCode !== room.code) leaveCurrent();
       rec.roomCode = room.code;
-      room.join(rec.id, rec.name, socket.id);
+      room.join(rec.id, rec.name, socket.id, rec.skin);
       return room.state();
     };
 
     socket.on('hello', (payload, ack) => {
       if (typeof ack !== 'function') return;
-      const p = (typeof payload === 'object' && payload !== null ? payload : {}) as { name?: unknown; token?: unknown };
-      const rec = players.identify(p.name, p.token, socket.id);
+      const p = (typeof payload === 'object' && payload !== null ? payload : {}) as { name?: unknown; token?: unknown; skin?: unknown };
+      const rec = players.identify(p.name, p.token, socket.id, p.skin);
       playerId = rec.id;
       socket.data.playerId = rec.id;
       socket.data.name = rec.name;

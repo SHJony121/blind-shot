@@ -11,6 +11,7 @@ import type {
 
 export interface HelloPayload {
   name: string;
+  skin?: string;
   /** Session token from a previous connection, used to reclaim a seat after a drop. */
   token?: string;
 }

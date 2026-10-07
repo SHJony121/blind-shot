@@ -6,7 +6,10 @@ import type { MatchConfig, MatchEvent, Phase } from '../types';
 /** What a game mode may touch. Owned by MatchSimulation. */
 export interface ModeContext {
   readonly config: MatchConfig;
+  /** Current (possibly shrunk) arena. */
   readonly arena: ArenaDef;
+  /** Shrink / restore the arena (1 = full size). */
+  setArenaScale(scale: number): void;
   readonly rng: Rng;
   readonly players: Map<string, SimPlayer>;
   emit(event: MatchEvent): void;

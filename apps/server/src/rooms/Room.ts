@@ -9,6 +9,7 @@ import {
   type RoomMember,
   type RoomState,
   type RoomVisibility,
+  type SkinId,
   type TeamId,
 } from '@blindshot/shared';
 import { MatchRunner } from '../game/MatchRunner';
@@ -17,6 +18,7 @@ import type { BlindShotServer } from '../networking/types';
 interface Member {
   id: string;
   name: string;
+  skin: SkinId;
   ready: boolean;
   socketId: string | null;
   team: TeamId;
@@ -72,13 +74,13 @@ export class Room {
 
   // --- Membership --------------------------------------------------------------
 
-  join(id: string, name: string, socketId: string): void {
+  join(id: string, name: string, socketId: string, skin: SkinId = 'DUMMY'): void {
     const existing = this.members.get(id);
     if (existing) {
       this.reconnect(id, socketId, name);
       return;
     }
-    this.members.set(id, { id, name, ready: false, socketId, team: this.nextTeam(), joinedAt: Date.now(), dropTimer: null });
+    this.members.set(id, { id, name, skin, ready: false, socketId, team: this.nextTeam(), joinedAt: Date.now(), dropTimer: null });
     this.io.in(socketId).socketsJoin(this.channel);
     this.clampBots();
     this.broadcastState();
@@ -164,7 +166,7 @@ export class Room {
     }
     if (humans.length + bots < MIN_PLAYERS) return 'NEED AT LEAST 2 SUBJECTS';
 
-    const seeds: PlayerSeed[] = humans.map((m) => ({ id: m.id, name: m.name, isBot: false, isHost: m.id === this.hostId, team: m.team }));
+    const seeds: PlayerSeed[] = humans.map((m) => ({ id: m.id, name: m.name, skin: m.skin, isBot: false, isHost: m.id === this.hostId, team: m.team }));
     const teamCount = { 1: humans.filter((m) => m.team === 1).length, 2: humans.filter((m) => m.team === 2).length };
     for (let i = 0; i < bots; i++) {
       let team: TeamId = 0;

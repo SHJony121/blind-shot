@@ -75,7 +75,7 @@ export function Hud({ actions }: { actions: HudActions }) {
 
       {h.roomCode ? <div className="room-chip">ROOM {h.roomCode}</div> : null}
 
-      {h.banner && !h.roundResult && !h.matchResult ? (
+      {h.banner && !h.popup && !h.roundResult && !h.matchResult ? (
         <div className="banner-wrap">
           <div key={h.banner.id} className={`banner ${h.banner.size} ${h.banner.tone}`}>
             {h.banner.tone === 'danger' && h.banner.subtitle === 'SHOOTOUT IN' ? <div className="sub">SHOOTOUT IN</div> : null}
@@ -100,6 +100,10 @@ export function Hud({ actions }: { actions: HudActions }) {
       {h.roundResult && !h.matchResult ? <RoundResult /> : null}
 
       {h.spectating && !h.roundResult && !h.matchResult ? <div className="spectating">ELIMINATED · SPECTATING</div> : null}
+
+      {(h.phase === 'FREEZE' || h.phase === 'SHOOTING' || h.phase === 'REVEAL') && !h.matchResult ? (
+        <div className="inspect-hint">SCROLL = ZOOM · DRAG = LOOK AROUND</div>
+      ) : null}
 
       {h.hintsVisible && (h.phase === 'VISIBLE' || h.phase === 'SPAWN') && h.round === 1 ? (
         <div className="hints">
@@ -142,7 +146,7 @@ function RoundResult() {
   else title = r.winnerIds[0] === h.localId ? 'YOU WIN THE ROUND' : `${nameOf(roster.find((p) => p.id === r.winnerIds[0]), h.localId)} WINS`;
   const winner = roster.find((p) => p.id === r.winnerIds[0]);
   return (
-    <div className="screen-center" style={{ background: 'transparent' }}>
+    <div className="round-result-wrap">
       <div className="panel results-card">
         <div className="label">ROUND {pad2(r.round)} · TEST COMPLETE</div>
         <div className="winner">{title}</div>

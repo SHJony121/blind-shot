@@ -1,6 +1,6 @@
-import { getArena, type ArenaDef } from '../arena/arena';
+import { getArena, scaleArena, type ArenaDef } from '../arena/arena';
 import { BotBrain } from '../bots/BotBrain';
-import { SUBJECT_COLORS } from '../constants/game';
+import { SKINS, SUBJECT_COLORS, isSkin } from '../constants/game';
 import { emptyStats } from '../gameState/config';
 import { BlindShotMode } from '../modes/blindShot/BlindShotMode';
 import type { GameMode, ModeContext } from '../modes/GameMode';
@@ -17,7 +17,10 @@ const MAX_QUEUED_INPUTS = 6;
  * for online play — the exact same code in both places.
  */
 export class MatchSimulation {
-  readonly arena: ArenaDef;
+  /** Current arena (shrinks each round); `baseArena` is the full-size map. */
+  arena: ArenaDef;
+  arenaScale = 1;
+  readonly baseArena: ArenaDef;
   readonly players = new Map<string, SimPlayer>();
   time = 0;
 
@@ -32,7 +35,8 @@ export class MatchSimulation {
     seeds: readonly PlayerSeed[],
     seed: number = Date.now(),
   ) {
-    this.arena = getArena(config.mapId);
+    this.baseArena = getArena(config.mapId);
+    this.arena = this.baseArena;
     this.rng = new Rng(seed);
     this.mode = new BlindShotMode();
 
@@ -44,6 +48,7 @@ export class MatchSimulation {
         name: s.name,
         subject: subjectIndex + 1,
         colorIndex: subjectIndex % SUBJECT_COLORS.length,
+        skin: isSkin(s.skin) ? s.skin : s.isBot ? (this.rng.pick(SKINS) ?? 'DUMMY') : 'DUMMY',
         team,
         isBot: s.isBot,
         botDifficulty: s.isBot ? s.botDifficulty ?? config.botDifficulty : null,
@@ -61,13 +66,20 @@ export class MatchSimulation {
       this.players.set(player.id, player);
       if (player.isBot) {
         const diff = player.botDifficulty ?? 'NORMAL';
-        this.bots.set(player.id, new BotBrain(player.id, team, diff, this.arena, new Rng(this.rng.int(1, 1e9))));
+        this.bots.set(player.id, new BotBrain(player.id, team, diff, () => this.arena, new Rng(this.rng.int(1, 1e9))));
       }
     });
 
+    const sim = this;
     const ctx: ModeContext = {
       config: this.config,
-      arena: this.arena,
+      get arena() {
+        return sim.arena;
+      },
+      setArenaScale: (scale) => {
+        this.arenaScale = scale;
+        this.arena = scaleArena(this.baseArena, scale);
+      },
       rng: this.rng,
       players: this.players,
       emit: (e) => this.events.push(e),
@@ -162,6 +174,7 @@ export class MatchSimulation {
       bodies: visibleBodies(viewer, this.players.values(), this.mode.phase),
       teamWins: { ...this.mode.teamWins },
       config: this.config,
+      arenaScale: this.arenaScale,
       ackSeq: viewer?.lastSeq ?? 0,
     };
   }

@@ -22,7 +22,7 @@ export interface BoxObstacle {
 
 export type Obstacle = CircleObstacle | BoxObstacle;
 
-export type ArenaTheme = 'chamber' | 'factory' | 'cooling';
+export type ArenaTheme = 'clean' | 'chamber' | 'factory' | 'cooling';
 
 /**
  * Gameplay geometry of an arena. Everything gameplay-relevant is 2D (XZ plane):
@@ -320,10 +320,47 @@ export const COOLING_ROOM: ArenaDef = {
   ],
 };
 
+/** Bright, clean white test floor under an open sky: the classic look. */
+export const WHITE_ROOM: ArenaDef = {
+  id: 'WHITE_ROOM',
+  name: 'WHITE ROOM',
+  theme: 'clean',
+  halfX: 16,
+  halfZ: 16,
+  wallHeight: 2.2,
+  obstacles: [
+    box(-7, -4, 1.0, 1.0, 1.8),
+    box(7, 4, 1.0, 1.0, 1.8),
+    box(-3, 8, 2.2, 0.5, 1.6),
+    box(3, -8, 2.2, 0.5, 1.6),
+    circle(9, -9, 0.7, 2.6),
+    circle(-9, 9, 0.7, 2.6),
+  ],
+};
+
 export const ARENAS: Record<MapId, ArenaDef> = {
+  WHITE_ROOM,
   TEST_CHAMBER_01,
   FACTORY_FLOOR,
   COOLING_ROOM,
 };
 
-export const getArena = (id: MapId): ArenaDef => ARENAS[id] ?? TEST_CHAMBER_01;
+export const getArena = (id: MapId): ArenaDef => ARENAS[id] ?? WHITE_ROOM;
+
+/**
+ * The arena for a given shrink scale: walls move in, obstacle layout scales with them,
+ * obstacle sizes stay the same. Obstacles that would no longer fit are dropped.
+ */
+export function scaleArena(def: ArenaDef, scale: number): ArenaDef {
+  if (scale >= 0.999) return def;
+  const halfX = def.halfX * scale;
+  const halfZ = def.halfZ * scale;
+  const obstacles = def.obstacles
+    .map((o) => ({ ...o, pos: { x: o.pos.x * scale, z: o.pos.z * scale } }))
+    .filter((o) => {
+      const ex = o.kind === 'circle' ? o.radius : o.halfX;
+      const ez = o.kind === 'circle' ? o.radius : o.halfZ;
+      return Math.abs(o.pos.x) + ex < halfX - 1.5 && Math.abs(o.pos.z) + ez < halfZ - 1.5;
+    });
+  return { ...def, halfX, halfZ, obstacles };
+}

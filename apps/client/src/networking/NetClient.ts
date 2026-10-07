@@ -7,6 +7,7 @@ import type {
   ServerToClientEvents,
   WelcomePayload,
 } from '@blindshot/shared';
+import { settingsStore } from '../state/settings';
 import { Store } from '../state/store';
 
 export type BlindShotSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -132,7 +133,7 @@ export class NetClient {
   }
 
   private async hello(): Promise<void> {
-    const res = await this.call<WelcomePayload>((s, ack) => s.emit('hello', { name: this.name, token: readToken() }, ack));
+    const res = await this.call<WelcomePayload>((s, ack) => s.emit('hello', { name: this.name, skin: settingsStore.get().skin, token: readToken() }, ack));
     if (res.ok) {
       writeToken(res.data.token);
       this.store.set({ status: 'online', playerId: res.data.playerId, error: null });

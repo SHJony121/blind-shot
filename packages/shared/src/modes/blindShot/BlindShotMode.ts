@@ -1,6 +1,7 @@
 import { randomSpawns } from '../../arena/arena';
 import {
   MAX_SHOTS_PER_ROUND,
+  arenaScaleForRound,
   PHASE_DURATIONS,
   SCORE,
   SHOT_INTERVAL,
@@ -56,6 +57,8 @@ export class BlindShotMode implements GameMode {
   startRound(): void {
     this.round += 1;
     this.shot = 1;
+    // Every round the walls close in a little.
+    this.ctx.setArenaScale(arenaScaleForRound(this.round));
     const players = [...this.ctx.players.values()];
     const spawns = randomSpawns(
       this.ctx.arena,

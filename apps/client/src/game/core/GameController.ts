@@ -32,6 +32,7 @@ import type { ClientWorld } from './ClientWorld';
 const STEP = 1 / SIM_TICK_RATE;
 const raycaster = new THREE.Raycaster();
 const aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -MUZZLE_HEIGHT);
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const v3 = new THREE.Vector3();
 const ndc = new THREE.Vector2();
 
@@ -123,9 +124,9 @@ export class GameController {
     this.world.input.setEnabled(true);
     this.world.cameraRig.mode = 'menu';
     this.world.cameraTarget = () => ({ subject: null, aim: null });
-    this.world.setArena('TEST_CHAMBER_01');
+    this.world.setArena('WHITE_ROOM');
     this.world.chamber.setMood('menu');
-    this.world.chamber.setDisplay('TEST CHAMBER 01', 'SUBJECTS STAND BY');
+    this.world.chamber.setDisplay('WHITE ROOM', 'SUBJECTS STAND BY');
     this.world.effects.clearDecals();
     audio.setLaserHum(false);
     hudStore.set(initialHud());
@@ -139,10 +140,10 @@ export class GameController {
     this.viewReceivedAt = performance.now() / 1000;
     this.roster.clear();
     for (const p of view.roster) this.roster.set(p.id, p);
-    // First view of a match: build the right arena before any subject exists.
-    if (view.config.mapId !== this.world.arena.id && this.views.size === 0) {
-      this.world.setArena(view.config.mapId);
-      this.world.chamber.setMood('normal');
+    // Build the right arena (it shrinks every round) while no ragdoll is lying around.
+    if (this.views.size === 0 || view.phase === 'ROUND_INTRO') {
+      if (this.views.size === 0) this.world.chamber.setMood('normal');
+      this.world.setArena(view.config.mapId, view.arenaScale);
     }
 
     const present = new Set<string>();
@@ -248,6 +249,7 @@ export class GameController {
     if (rounded !== hudStore.get().timeLeft) hudStore.set({ timeLeft: rounded });
 
     this.sampleLocalInput(dt, view);
+    this.updateInspect(view);
 
     const renderTime = view.time + sincePacket - this.session.interpolationDelay;
     const localId = this.session.localId;
@@ -287,6 +289,29 @@ export class GameController {
       const aiming = view.phase !== 'ROUND_INTRO';
       sv.update(dt, this.world.arena, targets.filter((t) => t.id !== sv.id), aiming);
     }
+  }
+
+  /** After the freeze: scroll to zoom toward the cursor, drag to orbit. */
+  private updateInspect(view: MatchView): void {
+    const rig = this.world.cameraRig;
+    const cam = this.world.input.consumeCamera();
+    const allowed = (view.phase === 'FREEZE' || view.phase === 'SHOOTING' || view.phase === 'REVEAL') && !this.paused;
+    if (!allowed) {
+      if (rig.inspect.enabled) Object.assign(rig.inspect, { enabled: false, zoom: 1, yaw: 0, pitch: 0, focus: null });
+      return;
+    }
+    rig.inspect.enabled = true;
+    if (cam.wheel !== 0) {
+      rig.inspect.zoom = Math.max(0.22, Math.min(1.5, rig.inspect.zoom * Math.pow(1.15, cam.wheel)));
+      if (cam.wheel < 0) {
+        ndc.set(this.world.input.state.pointerX, this.world.input.state.pointerY);
+        raycaster.setFromCamera(ndc, this.world.engine.camera);
+        const hit = raycaster.ray.intersectPlane(groundPlane, v3);
+        if (hit) rig.inspect.focus = { x: hit.x, z: hit.z };
+      }
+    }
+    rig.inspect.yaw -= cam.dragX * 0.006;
+    rig.inspect.pitch = Math.max(-0.9, Math.min(0.6, rig.inspect.pitch + cam.dragY * 0.004));
   }
 
   private sampleLocalInput(dt: number, view: MatchView): void {
@@ -453,12 +478,13 @@ export class GameController {
     const label = isLocal ? 'YOU' : `${String(info.subject).padStart(2, '0')} ${info.name.toUpperCase()}`;
     const sv = new SubjectView(
       id,
-      { bodyColor: this.bodyColor(info), accentColor: SUBJECT_COLORS[info.colorIndex] ?? '#e3b23c', subject: info.subject },
+      { bodyColor: this.bodyColor(info), accentColor: SUBJECT_COLORS[info.colorIndex] ?? '#e3b23c', subject: info.subject, skin: info.skin },
       label,
       this.laserColor(info),
       this.world.engine.scene,
       isLocal,
     );
+    sv.laser.setBright(this.world.chamber.bright);
     this.views.set(id, sv);
     return sv;
   }
@@ -525,13 +551,15 @@ export class GameController {
 
   private laserColor(info: PlayerInfo): string {
     const settings = settingsStore.get();
+    // Saturated colours on bright maps, glowing pastel ones on dark maps.
+    const bright = this.world.chamber.bright;
     const local = this.roster.get(this.session.localId);
     if (settings.laserPalette === 'HIGH_CONTRAST') {
       if (info.id === this.session.localId) return '#00e5ff';
       if (local && local.team !== 0 && local.team === info.team) return '#7dff6a';
       return '#ff2bd6';
     }
-    return `#${shade(this.bodyColor(info), 0.12).getHexString()}`;
+    return `#${shade(this.bodyColor(info), bright ? -0.08 : 0.12).getHexString()}`;
   }
 
   private panFor(p: THREE.Vector3, cam: THREE.Camera): number {

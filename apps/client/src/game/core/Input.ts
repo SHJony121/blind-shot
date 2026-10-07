@@ -11,23 +11,54 @@ export interface InputState {
   pointerY: number;
   /** Accumulated horizontal mouse movement since the last read (pointer-lock aim mode). */
   turnDelta: number;
+  /** Mouse wheel delta since the last read (camera zoom). */
+  wheel: number;
+  /** Mouse drag since the last read (camera orbit). */
+  dragX: number;
+  dragY: number;
 }
 
 type Listener = (key: string) => void;
 
 export class Input {
-  readonly state: InputState = { moveX: 0, moveY: 0, sprint: false, pointerX: 0, pointerY: 0, turnDelta: 0 };
+  readonly state: InputState = { moveX: 0, moveY: 0, sprint: false, pointerX: 0, pointerY: 0, turnDelta: 0, wheel: 0, dragX: 0, dragY: 0 };
   private readonly keys = new Set<string>();
   private readonly pressListeners = new Set<Listener>();
   private readonly releaseListeners = new Set<Listener>();
   private enabled = true;
+  private dragging = false;
 
   constructor(private readonly element: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
     window.addEventListener('mousemove', this.onMouseMove);
+    element.addEventListener('wheel', this.onWheel, { passive: false });
+    element.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointerup', this.onPointerUp);
   }
+
+  /** Read and reset wheel + drag accumulated since the last call. */
+  consumeCamera(): { wheel: number; dragX: number; dragY: number } {
+    const out = { wheel: this.state.wheel, dragX: this.state.dragX, dragY: this.state.dragY };
+    this.state.wheel = 0;
+    this.state.dragX = 0;
+    this.state.dragY = 0;
+    return out;
+  }
+
+  private onWheel = (e: WheelEvent): void => {
+    e.preventDefault();
+    this.state.wheel += Math.sign(e.deltaY) * Math.min(3, Math.abs(e.deltaY) / 100 + 0.5);
+  };
+
+  private onPointerDown = (e: PointerEvent): void => {
+    if (e.button === 0 || e.button === 2) this.dragging = true;
+  };
+
+  private onPointerUp = (): void => {
+    this.dragging = false;
+  };
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
@@ -64,6 +95,9 @@ export class Input {
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('mousemove', this.onMouseMove);
+    this.element.removeEventListener('wheel', this.onWheel);
+    this.element.removeEventListener('pointerdown', this.onPointerDown);
+    window.removeEventListener('pointerup', this.onPointerUp);
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -92,6 +126,10 @@ export class Input {
     this.state.pointerX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
     this.state.pointerY = -(((e.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
     if (document.pointerLockElement === this.element) this.state.turnDelta += e.movementX;
+    else if (this.dragging) {
+      this.state.dragX += e.movementX;
+      this.state.dragY += e.movementY;
+    }
   };
 
   private recompute(): void {

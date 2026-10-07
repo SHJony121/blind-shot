@@ -1,4 +1,4 @@
-import { guestName, sanitizeName } from '@blindshot/shared';
+import { guestName, isSkin, sanitizeName, type SkinId } from '@blindshot/shared';
 import { Store } from './store';
 
 export type AimMode = 'CURSOR' | 'MOUSE_TURN';
@@ -6,6 +6,8 @@ export type LaserPalette = 'SUBJECT' | 'HIGH_CONTRAST';
 
 export interface Settings {
   name: string;
+  /** Your character look. */
+  skin: SkinId;
   /** Master switches: OFF silences that bus regardless of its volume slider. */
   musicOn: boolean;
   soundOn: boolean;
@@ -28,6 +30,7 @@ const KEY = 'blindshot.settings.v1';
 
 const defaults = (): Settings => ({
   name: guestName(),
+  skin: 'DUMMY',
   musicOn: true,
   soundOn: true,
   masterVolume: 0.8,
@@ -51,6 +54,7 @@ function load(): Settings {
     const parsed = JSON.parse(raw) as Partial<Settings>;
     const merged = { ...base, ...parsed };
     merged.name = sanitizeName(merged.name, base.name);
+    if (!isSkin(merged.skin)) merged.skin = 'DUMMY';
     return merged;
   } catch {
     return base;

@@ -51,7 +51,7 @@ export function App() {
 
   return (
     <>
-      <canvas ref={canvasRef} className={`world ${inGame ? 'in-game' : ''}`} tabIndex={0} onPointerDown={() => audio.unlock()} />
+      <canvas ref={canvasRef} className={`world ${inGame ? 'in-game' : ''}`} tabIndex={0} onPointerDown={() => audio.unlock()} onContextMenu={(e) => e.preventDefault()} />
 
       {app.loading ? (
         <div className="loading">
@@ -65,7 +65,7 @@ export function App() {
         <SoloSetup
           onStart={(c) => {
             audio.unlock();
-            game.startSolo({ name: settingsStore.get().name, bots: c.bots, difficulty: c.difficulty, config: c.config });
+            game.startSolo({ name: settingsStore.get().name, skin: settingsStore.get().skin, bots: c.bots, difficulty: c.difficulty, config: c.config });
           }}
         />
       ) : null}

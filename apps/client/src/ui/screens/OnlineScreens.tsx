@@ -221,8 +221,8 @@ export function Lobby() {
                 </Field>
                 <Field label="VISIBLE / HIDDEN">
                   <div className="row">
-                    <Slider value={cfg.visibleSeconds} min={3} max={8} step={0.5} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
-                    <Slider value={cfg.blindSeconds} min={3} max={8} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
+                    <Slider value={cfg.visibleSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
+                    <Slider value={cfg.blindSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
                   </div>
                 </Field>
                 <Field label="SHOTS">

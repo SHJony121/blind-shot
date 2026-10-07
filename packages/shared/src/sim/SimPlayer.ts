@@ -1,4 +1,5 @@
 import type { Vec2 } from '../math/vec';
+import type { SkinId } from '../constants/game';
 import type { BotDifficulty, PlayerInfo, PlayerInput, PlayerStats, TeamId } from '../types';
 
 /** Authoritative per-subject state inside a MatchSimulation. Never sent raw over the network. */
@@ -7,6 +8,7 @@ export interface SimPlayer {
   name: string;
   subject: number;
   colorIndex: number;
+  skin: SkinId;
   team: TeamId;
   isBot: boolean;
   botDifficulty: BotDifficulty | null;
@@ -28,6 +30,7 @@ export const toPlayerInfo = (p: SimPlayer): PlayerInfo => ({
   name: p.name,
   subject: p.subject,
   colorIndex: p.colorIndex,
+  skin: p.skin,
   team: p.team,
   isBot: p.isBot,
   botDifficulty: p.botDifficulty,

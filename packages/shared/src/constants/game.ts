@@ -24,7 +24,7 @@ export const PHASE_DURATIONS = {
   SPAWN: 0.7,
   HIDE: 0.7,
   /** Everyone revealed and frozen, aims locked, lasers on. */
-  FREEZE: 1.3,
+  FREEZE: 3.0,
   REVEAL: 1.6,
   ROUND_RESULTS: 3.2,
 } as const;
@@ -39,12 +39,23 @@ export const SIMULTANEOUS_SHOOTING_TIME = 1.6;
 export const DEFAULT_VISIBLE_SECONDS = 5;
 export const DEFAULT_BLIND_SECONDS = 5;
 export const MIN_VISIBLE_SECONDS = 2;
-export const MAX_VISIBLE_SECONDS = 10;
+export const MAX_VISIBLE_SECONDS = 15;
 export const MIN_BLIND_SECONDS = 3;
-export const MAX_BLIND_SECONDS = 8;
+export const MAX_BLIND_SECONDS = 15;
 
 /** A round that has not produced a winner after this many shots is a draw. */
 export const MAX_SHOTS_PER_ROUND = 6;
+
+/** The arena shrinks every round of a match: scale = max(MIN, 1 - STEP * (round - 1)). */
+export const ARENA_SHRINK_PER_ROUND = 0.12;
+export const MIN_ARENA_SCALE = 0.5;
+export const arenaScaleForRound = (round: number): number =>
+  Math.max(MIN_ARENA_SCALE, 1 - ARENA_SHRINK_PER_ROUND * Math.max(0, round - 1));
+
+/** Selectable character looks (all original designs). */
+export const SKINS = ['DUMMY', 'ROBOT', 'ASTRO', 'WORKER', 'BEANIE', 'CAT'] as const;
+export type SkinId = (typeof SKINS)[number];
+export const isSkin = (v: unknown): v is SkinId => typeof v === 'string' && (SKINS as readonly string[]).includes(v);
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 8;

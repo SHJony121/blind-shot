@@ -4,6 +4,7 @@ import { inkedMesh, toon, toonGradient } from '../characters/materials';
 import { canvasTexture } from '../characters/textures';
 import {
   chamberWallTexture,
+  cleanWallTexture,
   coolingWallTexture,
   crateTexture,
   emblemTexture,
@@ -25,6 +26,13 @@ interface MoodLevels {
   exposure: number;
 }
 
+const BRIGHT_MOODS: Record<LightMood, MoodLevels> = {
+  menu: { key: 2.4, fill: 1.0, hemi: 1.6, practical: 0, emergency: 0, exposure: 1.0 },
+  normal: { key: 2.6, fill: 1.0, hemi: 1.7, practical: 0, emergency: 0, exposure: 1.0 },
+  blind: { key: 0.6, fill: 0.3, hemi: 0.45, practical: 0, emergency: 50, exposure: 0.95 },
+  alert: { key: 0.7, fill: 0.35, hemi: 0.5, practical: 0, emergency: 80, exposure: 1.0 },
+};
+
 const MOODS: Record<LightMood, MoodLevels> = {
   menu: { key: 2.0, fill: 0.7, hemi: 0.8, practical: 60, emergency: 0, exposure: 1.0 },
   normal: { key: 2.5, fill: 0.8, hemi: 0.85, practical: 70, emergency: 0, exposure: 1.05 },
@@ -33,6 +41,8 @@ const MOODS: Record<LightMood, MoodLevels> = {
 };
 
 interface ThemeStyle {
+  /** Bright open-sky look (no industrial props, light lighting). */
+  bright: boolean;
   label: string;
   wall: (label: string, repeat: number) => THREE.Texture;
   pillar: string;
@@ -43,9 +53,10 @@ interface ThemeStyle {
 }
 
 const THEMES: Record<ArenaTheme, ThemeStyle> = {
-  chamber: { label: '01', wall: chamberWallTexture, pillar: '#4b555e', block: 'metal', emblem: '#e3b23c', windows: true, trim: '#d6a531' },
-  factory: { label: '02', wall: factoryWallTexture, pillar: '#d6a531', block: 'crate', emblem: '#e3b23c', windows: false, trim: '#2b2f33' },
-  cooling: { label: '03', wall: coolingWallTexture, pillar: '#dfe6ea', block: 'machine', emblem: null, windows: true, trim: '#2f6f8f' },
+  clean: { bright: true, label: '00', wall: cleanWallTexture, pillar: '#f2f4f6', block: 'metal', emblem: null, windows: false, trim: '#d5dbe1' },
+  chamber: { bright: false, label: '01', wall: chamberWallTexture, pillar: '#4b555e', block: 'metal', emblem: '#e3b23c', windows: true, trim: '#d6a531' },
+  factory: { bright: false, label: '02', wall: factoryWallTexture, pillar: '#d6a531', block: 'crate', emblem: '#e3b23c', windows: false, trim: '#2b2f33' },
+  cooling: { bright: false, label: '03', wall: coolingWallTexture, pillar: '#dfe6ea', block: 'machine', emblem: null, windows: true, trim: '#2f6f8f' },
 };
 
 /**
@@ -85,7 +96,9 @@ export class ArenaView {
     const { halfX: hx, halfZ: hz } = arena;
 
     // --- Lights (same count on every map so shaders never recompile) ---------
-    this.hemi = new THREE.HemisphereLight('#a9bfd6', '#1d1712', 0.8);
+    this.hemi = this.style.bright
+      ? new THREE.HemisphereLight('#dff1ff', '#b9c2c9', 1.6)
+      : new THREE.HemisphereLight('#a9bfd6', '#1d1712', 0.8);
     this.key = new THREE.DirectionalLight('#fff0d8', 2.5);
     this.key.position.set(6, 26, -8);
     this.key.castShadow = true;
@@ -133,10 +146,26 @@ export class ArenaView {
     for (const ob of arena.obstacles) this.buildObstacle(ob);
   }
 
+  /** Sky / fog for this map (bright maps get an open sky). */
+  applyEnvironment(scene: THREE.Scene): void {
+    const sky = this.style.bright ? '#bfe0f5' : '#0d1114';
+    scene.background = new THREE.Color(sky);
+    scene.fog = this.style.bright ? new THREE.Fog(sky, 60, 140) : new THREE.Fog(sky, 30, 70);
+  }
+
   // --- Lighting control ------------------------------------------------------
 
   setMood(mood: LightMood): void {
     this.mood = mood;
+  }
+
+  /** Bright (daylight) map: lasers switch to solid colours so they read on white. */
+  get bright(): boolean {
+    return this.style.bright;
+  }
+
+  get currentMood(): LightMood {
+    return this.mood;
   }
 
   /** Stuttering power-cut flicker (used when targets are hidden). */
@@ -181,7 +210,7 @@ export class ArenaView {
 
   update(dt: number): void {
     this.time += dt;
-    const target = MOODS[this.mood];
+    const target = (this.style.bright ? BRIGHT_MOODS : MOODS)[this.mood];
     const k = Math.min(1, dt * 5);
     for (const key of Object.keys(this.levels) as (keyof MoodLevels)[]) {
       this.levels[key] += (target[key] - this.levels[key]) * k;
@@ -242,8 +271,8 @@ export class ArenaView {
     floor.receiveShadow = true;
     this.group.add(floor);
 
-    // Hazard border along every wall.
-    const band = 0.9;
+    // Hazard border along every wall (a plain thin trim on bright maps).
+    const band = this.style.bright ? 0.4 : 0.9;
     for (const [w, d, x, z] of [
       [hx * 2, band, 0, -hz + band / 2],
       [hx * 2, band, 0, hz - band / 2],
@@ -253,7 +282,9 @@ export class ArenaView {
       const long = w > d;
       const strip = new THREE.Mesh(
         new THREE.PlaneGeometry(long ? w : d, long ? d : w),
-        new THREE.MeshStandardMaterial({ map: hazardStripeTexture(Math.max(w, d) / 1.6), roughness: 0.7 }),
+        this.style.bright
+          ? new THREE.MeshStandardMaterial({ color: '#c9d1d8', roughness: 0.8 })
+          : new THREE.MeshStandardMaterial({ map: hazardStripeTexture(Math.max(w, d) / 1.6), roughness: 0.7 }),
       );
       strip.rotation.x = -Math.PI / 2;
       if (!long) strip.rotation.z = Math.PI / 2;
@@ -274,7 +305,11 @@ export class ArenaView {
     }
 
     // Dark void around the room (visible through the open near side).
-    const outside = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: '#07090b' }));
+    const outside = new THREE.Mesh(
+      new THREE.PlaneGeometry(400, 400),
+      this.style.bright ? new THREE.MeshStandardMaterial({ color: '#9fb3c2', roughness: 1 }) : new THREE.MeshBasicMaterial({ color: '#07090b' }),
+    );
+    outside.receiveShadow = this.style.bright;
     outside.rotation.x = -Math.PI / 2;
     outside.position.y = -0.05;
     this.group.add(outside);
@@ -299,6 +334,16 @@ export class ArenaView {
       mesh.rotation.y = wall.rot;
       mesh.receiveShadow = true;
       this.group.add(mesh);
+      if (this.style.bright) {
+        // Low white walls get a solid cap so they read from the high camera.
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(wall.w + 0.6, 0.3, 0.6), toon('#ffffff'));
+        cap.position.set(wall.x, h, wall.z);
+        cap.rotation.y = wall.rot;
+        cap.translateZ(-0.3);
+        cap.castShadow = true;
+        this.group.add(cap);
+        continue;
+      }
       // Nothing is mounted on the camera-side wall: it would sit between the camera and the floor.
       if (wall.z < 0 && wall.x === 0) continue;
 
@@ -320,6 +365,10 @@ export class ArenaView {
       this.group.add(holder);
     }
 
+    if (this.style.bright) {
+      this.buildBrightDecor();
+      return;
+    }
     // Wall displays (mirror the round phase): centre of the far wall and both side walls.
     const displaySpots = [
       { x: 0, z: hz - 0.15, rot: Math.PI, y: h * 0.62 },
@@ -397,6 +446,42 @@ export class ArenaView {
     this.group.add(label);
   }
 
+  /** Open-sky decor for bright maps: a big scoreboard sign and distant clouds. */
+  private buildBrightDecor(): void {
+    const { halfZ: hz } = this.arena;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this.displays.push({ canvas, tex });
+    const sign = new THREE.Group();
+    sign.position.set(0, 7, hz + 3);
+    sign.rotation.y = Math.PI;
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(9.4, 4.9, 0.4), toon('#20262b'));
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(9, 4.5), new THREE.MeshBasicMaterial({ map: tex }));
+    screen.position.z = 0.21;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 7, 10), toon('#c9d1d8'));
+    post.position.y = -4.5;
+    sign.add(bezel, screen, post);
+    this.group.add(sign);
+    this.setDisplay(this.arena.name, 'SUBJECTS STAND BY');
+    const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, fog: false });
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const cloud = new THREE.Group();
+      for (let k = 0; k < 4; k++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(3 + Math.random() * 2, 12, 8), cloudMat);
+        puff.position.set(k * 3.5, Math.random() * 1.5, Math.random() * 2);
+        puff.scale.y = 0.55;
+        cloud.add(puff);
+      }
+      cloud.position.set(Math.sin(a) * 85, 14 + Math.random() * 10, Math.cos(a) * 85);
+      cloud.lookAt(0, cloud.position.y, 0);
+      this.group.add(cloud);
+    }
+  }
+
   private buildObstacle(ob: Obstacle): void {
     const g = new THREE.Group();
     g.position.set(ob.pos.x, 0, ob.pos.z);
@@ -412,10 +497,10 @@ export class ArenaView {
       base.receiveShadow = true;
       const cap = new THREE.Mesh(
         new THREE.CylinderGeometry(ob.radius * (tank ? 0.95 : 0.7), ob.radius * 0.8, tank ? 0.3 : 0.12, 24),
-        tank ? toon('#9fb2bc') : this.lampMaterial,
+        tank ? toon('#9fb2bc') : this.style.bright ? toon('#ffffff') : this.lampMaterial,
       );
       cap.position.y = ob.height + (tank ? 0.15 : 0.06);
-      if (!tank) {
+      if (!tank && !this.style.bright) {
         const stripe = new THREE.Mesh(
           new THREE.CylinderGeometry(ob.radius + 0.01, ob.radius + 0.01, 0.4, 24, 1, true),
           new THREE.MeshStandardMaterial({ map: hazardStripeTexture(3), roughness: 0.6 }),
@@ -429,11 +514,11 @@ export class ArenaView {
       let mat: THREE.Material;
       if (this.style.block === 'crate') mat = new THREE.MeshToonMaterial({ map: crateTexture(), gradientMap: toonGradient() });
       else if (this.style.block === 'machine') mat = toon('#3f7f9f');
-      else mat = toon('#55606a');
+      else mat = toon(this.style.bright ? '#ffffff' : '#55606a');
       const block = inkedMesh(geo, mat, 0.03);
       block.position.y = ob.height / 2;
       g.add(block);
-      if (this.style.block !== 'crate') {
+      if (this.style.block !== 'crate' && !this.style.bright) {
         const top = new THREE.Mesh(
           new THREE.PlaneGeometry(ob.halfX * 2, ob.halfZ * 2),
           new THREE.MeshStandardMaterial({ map: hazardStripeTexture(Math.max(ob.halfX, ob.halfZ)), roughness: 0.6 }),

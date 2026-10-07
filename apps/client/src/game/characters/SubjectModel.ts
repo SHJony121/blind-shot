@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { SkinId } from '@blindshot/shared';
 import { GunModel } from '../weapons/GunModel';
 import { inkedMesh, shade, toon } from './materials';
 import { crashMarkerTexture, numberPatchTexture } from './textures';
@@ -23,6 +24,29 @@ const G = {
   leg: new THREE.CapsuleGeometry(0.135, 0.28, 6, 12),
   boot: new THREE.SphereGeometry(0.17, 14, 10),
   pack: new THREE.BoxGeometry(0.36, 0.4, 0.16),
+  robotHead: new THREE.BoxGeometry(0.78, 0.66, 0.7, 2, 2, 2),
+  screen: new THREE.PlaneGeometry(0.6, 0.3),
+  antenna: new THREE.CylinderGeometry(0.025, 0.025, 0.3, 6),
+  knob: new THREE.SphereGeometry(0.07, 10, 8),
+  bubble: new THREE.SphereGeometry(0.52, 24, 16),
+  bubbleRing: new THREE.TorusGeometry(0.4, 0.07, 8, 24),
+  hardHat: new THREE.SphereGeometry(0.44, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  brim: new THREE.CylinderGeometry(0.56, 0.56, 0.04, 28),
+  beanie: new THREE.SphereGeometry(0.43, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+  beanieFold: new THREE.TorusGeometry(0.4, 0.07, 8, 28),
+  pompom: new THREE.SphereGeometry(0.11, 10, 8),
+  ear: new THREE.ConeGeometry(0.14, 0.26, 4),
+  dot: new THREE.SphereGeometry(0.05, 10, 8),
+  mouth: new THREE.TorusGeometry(0.06, 0.015, 6, 12, Math.PI),
+};
+
+export const SKIN_LABELS: Record<SkinId, string> = {
+  DUMMY: 'TEST DUMMY',
+  ROBOT: 'UNIT BOT',
+  ASTRO: 'ASTRO',
+  WORKER: 'HARD HAT',
+  BEANIE: 'BEANIE',
+  CAT: 'KITTY',
 };
 
 export const SUBJECT_PART_NAMES = ['hips', 'torso', 'head', 'armL', 'armR', 'legL', 'legR'] as const;
@@ -32,6 +56,16 @@ export interface SubjectLook {
   bodyColor: string;
   accentColor: string;
   subject: number;
+  skin?: SkinId;
+}
+
+interface HeadMaterials {
+  skin: THREE.Material;
+  helmetMat: THREE.Material;
+  rubber: THREE.Material;
+  visorMat: THREE.Material;
+  eyeMat: THREE.Material;
+  suit: THREE.Material;
 }
 
 export interface SubjectAnimInput {
@@ -140,31 +174,9 @@ export class SubjectModel {
     torso.add(chest, belt, buckle, collar, patch, pack, backPatch);
     hips.add(torso);
 
-    // Head: pale dummy face, coloured helmet, dark visor with two bright eyes.
+    // Head: one of several original looks (see buildHead).
     head.position.y = 0.8;
-    const skull = inkedMesh(G.head, skin);
-    skull.position.y = 0.33;
-    const helmet = inkedMesh(G.helmet, helmetMat, 0.02);
-    helmet.position.y = 0.36;
-    helmet.rotation.x = -0.25;
-    const rim = new THREE.Mesh(G.helmetRim, rubber);
-    rim.position.y = 0.42;
-    rim.rotation.x = Math.PI / 2 - 0.25;
-    const visor = new THREE.Mesh(G.visor, visorMat);
-    visor.position.y = 0.3;
-    for (const side of [1, -1]) {
-      const eye = new THREE.Mesh(G.eye, eyeMat);
-      eye.position.set(0.12 * side, 0.31, 0.415);
-      head.add(eye);
-      const marker = new THREE.Mesh(
-        G.marker,
-        new THREE.MeshBasicMaterial({ map: crashMarkerTexture(), transparent: true }),
-      );
-      marker.position.set(0.432 * side, 0.36, -0.02);
-      marker.rotation.y = (Math.PI / 2) * side;
-      head.add(marker);
-    }
-    head.add(skull, helmet, rim, visor);
+    this.buildHead(head, look.skin ?? 'DUMMY', { skin, helmetMat, rubber, visorMat, eyeMat, suit });
     torso.add(head);
 
     // Arms: shoulder pivots; the static aim pose points both hands at the gun grip.
@@ -197,6 +209,112 @@ export class SubjectModel {
     torso.add(this.gunMount);
 
     this.root.add(hips);
+  }
+
+  private buildHead(head: THREE.Group, skin: SkinId, m: HeadMaterials): void {
+    const face = (eyesY: number, z: number, mouth = true) => {
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(G.dot, new THREE.MeshBasicMaterial({ color: '#15181c' }));
+        eye.position.set(0.13 * side, eyesY, z);
+        eye.scale.set(1, 1.35, 0.6);
+        head.add(eye);
+      }
+      if (mouth) {
+        const smile = new THREE.Mesh(G.mouth, new THREE.MeshBasicMaterial({ color: '#15181c' }));
+        smile.position.set(0, eyesY - 0.13, z - 0.01);
+        smile.rotation.z = Math.PI;
+        head.add(smile);
+      }
+    };
+    const skull = () => {
+      const sk = inkedMesh(G.head, m.skin);
+      sk.position.y = 0.33;
+      head.add(sk);
+    };
+
+    if (skin === 'ROBOT') {
+      const box = inkedMesh(G.robotHead, m.helmetMat, 0.02);
+      box.position.y = 0.36;
+      const screen = new THREE.Mesh(G.screen, m.visorMat);
+      screen.position.set(0, 0.36, 0.352);
+      for (const side of [1, -1]) {
+        const eye = new THREE.Mesh(G.eye, m.eyeMat);
+        eye.position.set(0.13 * side, 0.37, 0.36);
+        head.add(eye);
+      }
+      const antenna = new THREE.Mesh(G.antenna, m.rubber);
+      antenna.position.set(0.18, 0.82, 0);
+      const knob = new THREE.Mesh(G.knob, new THREE.MeshBasicMaterial({ color: '#ff4b3a' }));
+      knob.position.set(0.18, 0.98, 0);
+      head.add(box, screen, antenna, knob);
+      return;
+    }
+    if (skin === 'ASTRO') {
+      skull();
+      face(0.38, 0.39);
+      const glass = new THREE.Mesh(
+        G.bubble,
+        new THREE.MeshPhongMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.28, shininess: 120, specular: '#ffffff', depthWrite: false }),
+      );
+      glass.position.y = 0.36;
+      const ring = inkedMesh(G.bubbleRing, m.suit, 0.015);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = -0.02;
+      head.add(glass, ring);
+      return;
+    }
+    if (skin === 'WORKER') {
+      skull();
+      face(0.33, 0.39);
+      const hat = inkedMesh(G.hardHat, new THREE.MeshToonMaterial({ color: '#f2c230', gradientMap: (m.suit as THREE.MeshToonMaterial).gradientMap }), 0.02);
+      hat.position.y = 0.46;
+      const brim = new THREE.Mesh(G.brim, new THREE.MeshToonMaterial({ color: '#e0ad1c', gradientMap: (m.suit as THREE.MeshToonMaterial).gradientMap }));
+      brim.position.set(0, 0.47, 0.06);
+      head.add(hat, brim);
+      return;
+    }
+    if (skin === 'BEANIE') {
+      skull();
+      face(0.3, 0.39);
+      const hat = inkedMesh(G.beanie, m.helmetMat, 0.02);
+      hat.position.y = 0.43;
+      const fold = new THREE.Mesh(G.beanieFold, m.rubber);
+      fold.rotation.x = Math.PI / 2;
+      fold.position.y = 0.47;
+      const pom = inkedMesh(G.pompom, m.skin, 0.015);
+      pom.position.y = 0.9;
+      head.add(hat, fold, pom);
+      return;
+    }
+
+    // DUMMY (default) and CAT: dummy face, coloured helmet, dark visor with two bright eyes.
+    skull();
+    const helmet = inkedMesh(G.helmet, m.helmetMat, 0.02);
+    helmet.position.y = 0.36;
+    helmet.rotation.x = -0.25;
+    const rim = new THREE.Mesh(G.helmetRim, m.rubber);
+    rim.position.y = 0.42;
+    rim.rotation.x = Math.PI / 2 - 0.25;
+    const visor = new THREE.Mesh(G.visor, m.visorMat);
+    visor.position.y = 0.3;
+    for (const side of [1, -1]) {
+      const eye = new THREE.Mesh(G.eye, m.eyeMat);
+      eye.position.set(0.12 * side, 0.31, 0.415);
+      head.add(eye);
+      if (skin === 'CAT') {
+        const ear = inkedMesh(G.ear, m.helmetMat, 0.015);
+        ear.position.set(0.24 * side, 0.82, -0.02);
+        ear.rotation.z = -0.35 * side;
+        ear.rotation.y = Math.PI / 4;
+        head.add(ear);
+      } else {
+        const marker = new THREE.Mesh(G.marker, new THREE.MeshBasicMaterial({ map: crashMarkerTexture(), transparent: true }));
+        marker.position.set(0.432 * side, 0.36, -0.02);
+        marker.rotation.y = (Math.PI / 2) * side;
+        head.add(marker);
+      }
+    }
+    head.add(helmet, rim, visor);
   }
 
   /** World-space muzzle position (visual). */

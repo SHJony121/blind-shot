@@ -282,7 +282,7 @@ canvas.world.in-game {
 .id-tag {
   display: flex;
   align-items: stretch;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
   width: 340px;
   border: 3px solid #07090a;
   background: var(--paper);
@@ -1127,4 +1127,219 @@ canvas.world.in-game {
 
 .settings-grid .slider input[type='range'] {
   width: 170px;
+}
+
+/* ================================================================== minimal HUD
+   Everything in-game stays small and near the top edge so the arena and your
+   subject are never covered. (Overrides the earlier, larger HUD rules.) */
+
+.banner-wrap {
+  top: 66px;
+}
+
+.banner.xl .title {
+  font-size: clamp(28px, 3.2vw, 44px);
+}
+
+.banner.lg .title {
+  font-size: clamp(22px, 2.4vw, 32px);
+}
+
+.banner.md .title {
+  font-size: clamp(18px, 1.9vw, 26px);
+}
+
+.banner .title {
+  text-shadow: 3px 3px 0 #000;
+}
+
+.banner .sub {
+  margin-top: 4px;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.popup-wrap {
+  top: 64px;
+}
+
+.popup {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px 4px;
+  border-width: 2px;
+  box-shadow: 0 0 0 2px #000;
+  clip-path: none;
+}
+
+.popup-title {
+  font-size: 16px;
+}
+
+.popup-value {
+  font-size: 34px;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.popup-sub {
+  display: none;
+}
+
+.round-chip {
+  font-size: 16px;
+  padding: 4px 12px 2px;
+}
+
+.phase-bar {
+  width: 200px;
+  height: 5px;
+}
+
+.roster {
+  top: 12px;
+  left: 12px;
+  gap: 3px;
+}
+
+.roster-item {
+  min-width: 170px;
+  font-size: 14px;
+  gap: 8px;
+  padding: 3px 10px 1px 0;
+}
+
+.roster-item .num {
+  width: 20px;
+}
+
+.pip {
+  width: 7px;
+  height: 10px;
+}
+
+.team-score {
+  font-size: 22px;
+}
+
+.room-chip {
+  font-size: 14px;
+  top: 12px;
+  right: 12px;
+}
+
+.hints .hint {
+  font-size: 13px;
+  padding: 4px 8px 2px;
+}
+
+.spectating {
+  font-size: 15px;
+  padding: 4px 14px 2px;
+  border-width: 2px;
+  bottom: 14px;
+}
+
+.vignette-blind {
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 60%, rgba(90, 0, 0, 0.35) 100%);
+}
+
+/* Round result: a compact card at the top instead of the middle of the screen. */
+.round-result-wrap {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.results-card {
+  min-width: 0;
+  padding: 14px 22px 12px;
+}
+
+.results-card .winner {
+  font-size: clamp(24px, 2.8vw, 36px);
+  text-shadow: 2px 2px 0 #000;
+}
+
+.results-card .lines {
+  gap: 16px;
+  margin: 8px 0 4px;
+  font-size: 15px;
+}
+
+.next-in {
+  font-size: 13px;
+}
+
+.inspect-hint {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  padding: 4px 10px 2px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  background: rgba(10, 12, 14, 0.75);
+  border: 2px solid #000;
+  pointer-events: none;
+}
+
+/* Character picker under the name tag. */
+.skin-picker {
+  display: flex;
+  align-items: stretch;
+  width: 340px;
+  margin-bottom: 18px;
+  border: 3px solid #07090a;
+  background: var(--steel);
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
+}
+
+.skin-picker .tag-label {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--ink);
+  color: var(--hazard);
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.skin-picker button {
+  border: 0;
+  background: transparent;
+  color: var(--hazard);
+  font-size: 20px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.skin-picker button:hover {
+  background: rgba(227, 178, 60, 0.15);
+}
+
+.skin-name {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0 6px;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.05em;
+}
+
+@media (max-height: 700px) {
+  .skin-picker {
+    margin-bottom: 10px;
+  }
+  .skin-name {
+    font-size: 18px;
+    padding: 5px 0 3px;
+  }
 }

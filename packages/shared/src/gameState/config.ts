@@ -19,13 +19,13 @@ export const DEFAULT_MATCH_CONFIG: MatchConfig = {
   blindSeconds: DEFAULT_BLIND_SECONDS,
   fireOrder: 'SEQUENTIAL',
   friendlyFire: false,
-  mapId: 'TEST_CHAMBER_01',
+  mapId: 'WHITE_ROOM',
   botDifficulty: 'NORMAL',
 };
 
 const MODES: readonly GameModeId[] = ['FFA', 'TEAMS'];
 const FIRE_ORDERS: readonly FireOrder[] = ['SEQUENTIAL', 'SIMULTANEOUS'];
-export const MAP_IDS: readonly MapId[] = ['TEST_CHAMBER_01', 'FACTORY_FLOOR', 'COOLING_ROOM'];
+export const MAP_IDS: readonly MapId[] = ['WHITE_ROOM', 'TEST_CHAMBER_01', 'FACTORY_FLOOR', 'COOLING_ROOM'];
 const DIFFICULTIES: readonly BotDifficulty[] = ['EASY', 'NORMAL', 'HARD'];
 
 const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>

@@ -30,6 +30,16 @@ export class Effects {
   private trauma = 0;
   private shakeTime = 0;
   reducedFlash = false;
+
+  /** Bright maps: tracers are drawn solid orange instead of additive white. */
+  setBright(bright: boolean): void {
+    for (const t of this.tracers) {
+      const m = t.obj.material as THREE.MeshBasicMaterial;
+      m.blending = bright ? THREE.NormalBlending : THREE.AdditiveBlending;
+      m.color.set(bright ? '#ff8a1f' : '#fff2c0');
+      m.needsUpdate = true;
+    }
+  }
   shakeEnabled = true;
 
   constructor() {
