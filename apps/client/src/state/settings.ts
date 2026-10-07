@@ -6,6 +6,9 @@ export type LaserPalette = 'SUBJECT' | 'HIGH_CONTRAST';
 
 export interface Settings {
   name: string;
+  /** Master switches: OFF silences that bus regardless of its volume slider. */
+  musicOn: boolean;
+  soundOn: boolean;
   masterVolume: number;
   sfxVolume: number;
   musicVolume: number;
@@ -25,6 +28,8 @@ const KEY = 'blindshot.settings.v1';
 
 const defaults = (): Settings => ({
   name: guestName(),
+  musicOn: true,
+  soundOn: true,
   masterVolume: 0.8,
   sfxVolume: 0.9,
   musicVolume: 0.5,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DEFAULT_MATCH_CONFIG, type BotDifficulty, type MatchConfig } from '@blindshot/shared';
 import { go } from '../../game/GameApp';
-import { Button, Field, Panel, Seg, Slider } from '../components';
+import { Button, Field, MAP_OPTIONS, Panel, Seg, Slider } from '../components';
 
 export interface SoloChoice {
   bots: number;
@@ -9,7 +9,7 @@ export interface SoloChoice {
   config: MatchConfig;
 }
 
-const KEY = 'blindshot.solo.v1';
+const KEY = 'blindshot.solo.v2';
 
 function loadChoice(): SoloChoice {
   const base: SoloChoice = { bots: 3, difficulty: 'NORMAL', config: { ...DEFAULT_MATCH_CONFIG } };
@@ -88,17 +88,24 @@ export function SoloSetup({ onStart }: { onStart: (c: SoloChoice) => void }) {
         <Field label="VISIBLE PHASE">
           <Slider value={cfg.visibleSeconds} min={3} max={8} step={0.5} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
         </Field>
-        <Field label="BLIND PHASE">
-          <Slider value={cfg.blindSeconds} min={2} max={5} step={0.5} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
+        <Field label="HIDDEN COUNTDOWN">
+          <Slider value={cfg.blindSeconds} min={3} max={8} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
         </Field>
-        <Field label="MOVEMENT">
+        <Field label="MAP">
           <Seg
-            value={cfg.movement}
+            value={cfg.mapId}
+            options={MAP_OPTIONS}
+            onChange={(mapId) => set({ mapId })}
+          />
+        </Field>
+        <Field label="SHOTS">
+          <Seg
+            value={cfg.fireOrder}
             options={[
-              { value: 'LIGHT', label: 'ON' },
-              { value: 'FIXED', label: 'OFF (ROTATE ONLY)' },
+              { value: 'SEQUENTIAL', label: 'ONE BY ONE' },
+              { value: 'SIMULTANEOUS', label: 'ALL AT ONCE' },
             ]}
-            onChange={(movement) => set({ movement })}
+            onChange={(fireOrder) => set({ fireOrder })}
           />
         </Field>
         {teams ? (

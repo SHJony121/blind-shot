@@ -9,7 +9,7 @@ import {
   MIN_VISIBLE_SECONDS,
 } from '../constants/game';
 import { clamp } from '../math/vec';
-import type { BotDifficulty, GameModeId, MatchConfig, MovementMode, PlayerStats } from '../types';
+import type { BotDifficulty, FireOrder, GameModeId, MapId, MatchConfig, PlayerStats } from '../types';
 
 export const DEFAULT_MATCH_CONFIG: MatchConfig = {
   mode: 'FFA',
@@ -17,14 +17,15 @@ export const DEFAULT_MATCH_CONFIG: MatchConfig = {
   roundsToWin: 3,
   visibleSeconds: DEFAULT_VISIBLE_SECONDS,
   blindSeconds: DEFAULT_BLIND_SECONDS,
-  movement: 'LIGHT',
+  fireOrder: 'SEQUENTIAL',
   friendlyFire: false,
   mapId: 'TEST_CHAMBER_01',
   botDifficulty: 'NORMAL',
 };
 
 const MODES: readonly GameModeId[] = ['FFA', 'TEAMS'];
-const MOVEMENTS: readonly MovementMode[] = ['LIGHT', 'FIXED'];
+const FIRE_ORDERS: readonly FireOrder[] = ['SEQUENTIAL', 'SIMULTANEOUS'];
+export const MAP_IDS: readonly MapId[] = ['TEST_CHAMBER_01', 'FACTORY_FLOOR', 'COOLING_ROOM'];
 const DIFFICULTIES: readonly BotDifficulty[] = ['EASY', 'NORMAL', 'HARD'];
 
 const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
@@ -50,9 +51,9 @@ export function sanitizeConfig(input: unknown, base: MatchConfig = DEFAULT_MATCH
     roundsToWin: Math.round(clamp(num(raw.roundsToWin, base.roundsToWin), 1, 7)),
     visibleSeconds: clamp(num(raw.visibleSeconds, base.visibleSeconds), MIN_VISIBLE_SECONDS, MAX_VISIBLE_SECONDS),
     blindSeconds: clamp(num(raw.blindSeconds, base.blindSeconds), MIN_BLIND_SECONDS, MAX_BLIND_SECONDS),
-    movement: pick(MOVEMENTS, raw.movement, base.movement),
+    fireOrder: pick(FIRE_ORDERS, raw.fireOrder, base.fireOrder),
     friendlyFire: typeof raw.friendlyFire === 'boolean' ? raw.friendlyFire : base.friendlyFire,
-    mapId: 'TEST_CHAMBER_01',
+    mapId: pick(MAP_IDS, raw.mapId, base.mapId),
     botDifficulty: pick(DIFFICULTIES, raw.botDifficulty, base.botDifficulty),
   };
 }

@@ -12,7 +12,7 @@ import { go } from '../../game/GameApp';
 import { net } from '../../networking/NetClient';
 import { settingsStore } from '../../state/settings';
 import { useStore } from '../../state/store';
-import { Button, Field, Panel, Seg, Slider } from '../components';
+import { Button, Field, MAP_OPTIONS, Panel, Seg, Slider } from '../components';
 
 /** CREATE ROOM / JOIN ROOM. */
 export function OnlineMenu() {
@@ -219,21 +219,21 @@ export function Lobby() {
                 <Field label="ROUNDS TO WIN">
                   <Seg value={cfg.roundsToWin} options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: String(n) }))} onChange={(roundsToWin) => set({ roundsToWin })} />
                 </Field>
-                <Field label="VISIBLE / BLIND">
+                <Field label="VISIBLE / HIDDEN">
                   <div className="row">
                     <Slider value={cfg.visibleSeconds} min={3} max={8} step={0.5} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
-                    <Slider value={cfg.blindSeconds} min={2} max={5} step={0.5} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
+                    <Slider value={cfg.blindSeconds} min={3} max={8} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
                   </div>
                 </Field>
-                <Field label="MOVEMENT">
+                <Field label="SHOTS">
                   <Seg
-                    value={cfg.movement}
-                    options={[
-                      { value: 'LIGHT', label: 'ON' },
-                      { value: 'FIXED', label: 'OFF' },
-                    ]}
-                    onChange={(movement) => set({ movement })}
-                  />
+            value={cfg.fireOrder}
+            options={[
+              { value: 'SEQUENTIAL', label: 'ONE BY ONE' },
+              { value: 'SIMULTANEOUS', label: 'ALL AT ONCE' },
+            ]}
+            onChange={(fireOrder) => set({ fireOrder })}
+          />
                 </Field>
                 <Field label="FRIENDLY FIRE">
                   <Seg
@@ -246,7 +246,11 @@ export function Lobby() {
                   />
                 </Field>
                 <Field label="MAP">
-                  <Seg value={cfg.mapId} options={[{ value: 'TEST_CHAMBER_01', label: 'TEST CHAMBER 01' }]} onChange={(mapId) => set({ mapId })} />
+                  <Seg
+            value={cfg.mapId}
+            options={MAP_OPTIONS}
+            onChange={(mapId) => set({ mapId })}
+          />
                 </Field>
               </>
             ) : (
@@ -257,9 +261,9 @@ export function Lobby() {
                 <br />
                 VISIBLE {cfg.visibleSeconds}S · BLIND {cfg.blindSeconds}S
                 <br />
-                MOVEMENT: {cfg.movement === 'LIGHT' ? 'ON' : 'OFF'} · FRIENDLY FIRE: {cfg.friendlyFire ? 'ON' : 'OFF'}
+                SHOTS: {cfg.fireOrder === 'SEQUENTIAL' ? 'ONE BY ONE' : 'ALL AT ONCE'} · FRIENDLY FIRE: {cfg.friendlyFire ? 'ON' : 'OFF'}
                 <br />
-                MAP: TEST CHAMBER 01
+                MAP: {MAP_OPTIONS.find((m) => m.value === cfg.mapId)?.label}
                 <br />
                 <br />
                 WAITING FOR THE HOST TO START…

@@ -26,6 +26,7 @@ export function outlineMaterial(width = 0.025, color = '#101316'): THREE.MeshBas
   const cached = outlineCache.get(key);
   if (cached) return cached;
   const mat = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+  mat.name = 'shared-outline';
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',

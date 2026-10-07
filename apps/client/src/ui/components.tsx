@@ -1,5 +1,12 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { MapId } from '@blindshot/shared';
 import { audio } from '../game/audio/AudioEngine';
+
+export const MAP_OPTIONS: readonly { value: MapId; label: string }[] = [
+  { value: 'TEST_CHAMBER_01', label: 'TEST CHAMBER 01' },
+  { value: 'FACTORY_FLOOR', label: 'FACTORY FLOOR' },
+  { value: 'COOLING_ROOM', label: 'COOLING ROOM' },
+];
 
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'danger' | 'ghost' | 'default';

@@ -45,6 +45,8 @@ export interface HudState {
   roomCode: string | null;
   /** Incremented to trigger the full-screen gunshot flash. */
   flashId: number;
+  /** Centre-screen countdown popup ("PLAYERS REVEALED IN" 5..1). */
+  popup: { id: number; title: string; value: string } | null;
   /** Seconds since the match started (drives first-round control hints). */
   hintsVisible: boolean;
 }
@@ -71,6 +73,7 @@ export const initialHud = (): HudState => ({
   showScoreboard: false,
   roomCode: null,
   flashId: 0,
+  popup: null,
   hintsVisible: true,
 });
 

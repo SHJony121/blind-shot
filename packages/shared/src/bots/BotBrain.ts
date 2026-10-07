@@ -1,6 +1,5 @@
-import type { ArenaDef } from '../arena/arena';
-import { PAD_MOVE_RADIUS, PLAYER_HIT_RADIUS } from '../constants/game';
-import { rayCircle } from '../math/raycast';
+import { castRay, resolveCollisions, type ArenaDef } from '../arena/arena';
+import { PLAYER_HIT_RADIUS } from '../constants/game';
 import {
   angleDiff,
   distance,
@@ -36,35 +35,35 @@ interface BotProfile {
 export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
   EASY: {
     reaction: [0.6, 1.1],
-    memoryNoise: 0.75,
-    aimErrorDeg: 4.5,
-    jitterDeg: 2,
+    memoryNoise: 0.6,
+    aimErrorDeg: 3,
+    jitterDeg: 1.2,
     wrongTargetChance: 0.3,
     predictFactor: 0,
     dodgeGuessChance: 0,
-    dodgeChance: 0.15,
+    dodgeChance: 0.1,
     turnSpeed: 2.2,
   },
   NORMAL: {
     reaction: [0.3, 0.6],
-    memoryNoise: 0.3,
-    aimErrorDeg: 2.2,
-    jitterDeg: 0.8,
+    memoryNoise: 0.25,
+    aimErrorDeg: 1.4,
+    jitterDeg: 0.5,
     wrongTargetChance: 0.1,
     predictFactor: 0.5,
     dodgeGuessChance: 0.08,
-    dodgeChance: 0.25,
+    dodgeChance: 0.2,
     turnSpeed: 3.6,
   },
   HARD: {
     reaction: [0.15, 0.3],
-    memoryNoise: 0.12,
-    aimErrorDeg: 1.1,
-    jitterDeg: 0.4,
+    memoryNoise: 0.1,
+    aimErrorDeg: 0.7,
+    jitterDeg: 0.25,
     wrongTargetChance: 0.03,
     predictFactor: 1,
-    dodgeGuessChance: 0.15,
-    dodgeChance: 0.45,
+    dodgeGuessChance: 0.12,
+    dodgeChance: 0.3,
     turnSpeed: 5,
   },
 };
@@ -99,12 +98,11 @@ export class BotBrain {
     private readonly selfId: string,
     private readonly team: TeamId,
     difficulty: BotDifficulty,
-    private readonly padCenter: Vec2,
     private readonly arena: ArenaDef,
     private readonly rng: Rng,
   ) {
     this.profile = BOT_PROFILES[difficulty];
-    this.moveGoal = { ...padCenter };
+    this.moveGoal = { x: 0, z: 0 };
   }
 
   update(dt: number, view: MatchView): PlayerInput {
@@ -117,7 +115,7 @@ export class BotBrain {
     const enemies = view.bodies.filter((b) => b.alive && this.isEnemy(b.id, view) && b.visibility === 'full');
     for (const e of enemies) this.observe(e, view.time);
 
-    const hidden = view.phase === 'HIDE' || view.phase === 'BLIND' || view.phase === 'COUNTDOWN';
+    const hidden = view.phase === 'HIDE' || view.phase === 'COUNTDOWN';
     if (hidden && !this.wasHidden) this.onTargetsHidden(me, view);
     this.wasHidden = hidden;
 
@@ -158,8 +156,8 @@ export class BotBrain {
     this.predicted = null;
     this.aimOffset = (this.rng.gaussian() * this.profile.aimErrorDeg * Math.PI) / 180;
     this.wasHidden = false;
-    // Small idle shuffle while visible so bots don't look like statues.
-    this.moveGoal = this.randomPointOnPad(0.6);
+    // Wander a little while visible so bots don't look like statues.
+    this.moveGoal = this.randomPointNear(me.pos, 2.2);
   }
 
   private observe(e: BodyState, time: number): void {
@@ -218,27 +216,33 @@ export class BotBrain {
     }
     const mem = this.targetId ? this.memory.get(this.targetId) : undefined;
     if (mem) {
-      const lookAhead = 0.5 * (view.config.blindSeconds + 1.5) * this.profile.predictFactor;
+      // Extrapolate a little of the observed motion (people rarely keep running in a line).
+      const lookAhead = 0.6 * this.profile.predictFactor;
+      const drift = { x: mem.vel.x * lookAhead, z: mem.vel.z * lookAhead };
+      const dl = Math.hypot(drift.x, drift.z);
+      if (dl > 2) {
+        drift.x *= 2 / dl;
+        drift.z *= 2 / dl;
+      }
       let guess: Vec2 = {
-        x: mem.pos.x + mem.vel.x * lookAhead + this.rng.gaussian() * this.profile.memoryNoise,
-        z: mem.pos.z + mem.vel.z * lookAhead + this.rng.gaussian() * this.profile.memoryNoise,
+        x: mem.pos.x + drift.x + this.rng.gaussian() * this.profile.memoryNoise,
+        z: mem.pos.z + drift.z + this.rng.gaussian() * this.profile.memoryNoise,
       };
-      if (view.config.movement === 'LIGHT' && this.rng.chance(this.profile.dodgeGuessChance)) {
+      if (this.rng.chance(this.profile.dodgeGuessChance)) {
         // Guess the target sidesteps: offset perpendicular to our line of fire.
         const line = normalize(sub(mem.pos, me.pos));
         const side = this.rng.chance(0.5) ? 1 : -1;
-        guess = { x: guess.x - line.z * side * 1.1, z: guess.z + line.x * side * 1.1 };
+        guess = { x: guess.x - line.z * side * 1.6, z: guess.z + line.x * side * 1.6 };
       }
       this.predicted = guess;
     }
 
     // Decide whether to reposition while nobody can see us.
-    if (view.config.movement !== 'LIGHT') return;
     const threatened = [...this.memory.entries()].some(
       ([id, m]) => this.isEnemy(id, view) && this.isAimingAtFrom(m.pos, m.yaw, me.pos),
     );
     const chance = this.profile.dodgeChance * (threatened ? 1.8 : 0.6);
-    this.moveGoal = this.rng.chance(chance) ? this.randomPointOnPad(PAD_MOVE_RADIUS * 0.95) : { ...me.pos };
+    this.moveGoal = this.rng.chance(chance) ? this.randomPointNear(me.pos, 3) : { ...me.pos };
   }
 
   private isEnemy(id: string, view: MatchView): boolean {
@@ -259,17 +263,13 @@ export class BotBrain {
 
   private lineBlocked(from: Vec2, to: Vec2): boolean {
     const dir = normalize(sub(to, from));
-    const d = distance(from, to);
-    return this.arena.pillars.some((p) => {
-      const t = rayCircle(from, dir, p.pos, p.radius);
-      return t !== null && t < d;
-    });
+    return castRay(this.arena, from, dir, []).distance < distance(from, to);
   }
 
-  private randomPointOnPad(radius: number): Vec2 {
+  private randomPointNear(from: Vec2, radius: number): Vec2 {
     const a = this.rng.range(0, Math.PI * 2);
-    const r = Math.sqrt(this.rng.next()) * radius;
+    const r = (0.4 + 0.6 * Math.sqrt(this.rng.next())) * radius;
     const d = yawToDir(a);
-    return { x: this.padCenter.x + d.x * r, z: this.padCenter.z + d.z * r };
+    return resolveCollisions(this.arena, { x: from.x + d.x * r, z: from.z + d.z * r }, PLAYER_HIT_RADIUS * 2);
   }
 }

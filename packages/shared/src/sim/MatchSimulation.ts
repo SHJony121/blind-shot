@@ -1,4 +1,4 @@
-import { getArena, spawnPads, type ArenaDef } from '../arena/arena';
+import { getArena, type ArenaDef } from '../arena/arena';
 import { BotBrain } from '../bots/BotBrain';
 import { SUBJECT_COLORS } from '../constants/game';
 import { emptyStats } from '../gameState/config';
@@ -7,10 +7,10 @@ import type { GameMode, ModeContext } from '../modes/GameMode';
 import { Rng } from '../util/rng';
 import type { MatchConfig, MatchEvent, MatchView, Phase, PlayerInput, PlayerSeed, TeamId } from '../types';
 import { stepMovement } from './movement';
-
-const MAX_QUEUED_INPUTS = 6;
 import { toPlayerInfo, type SimPlayer } from './SimPlayer';
 import { visibleBodies } from './visibility';
+
+const MAX_QUEUED_INPUTS = 6;
 
 /**
  * Authoritative match simulation. Runs in the browser for solo play and on the server
@@ -37,9 +37,7 @@ export class MatchSimulation {
     this.mode = new BlindShotMode();
 
     const ordered = this.assignTeams(seeds);
-    const pads = spawnPads(this.arena, ordered.length);
-    ordered.forEach(({ seed: s, team }, padIndex) => {
-      const pad = pads[padIndex];
+    ordered.forEach(({ seed: s, team }) => {
       const subjectIndex = seeds.indexOf(s);
       const player: SimPlayer = {
         id: s.id,
@@ -53,18 +51,17 @@ export class MatchSimulation {
         isHost: s.isHost ?? false,
         inRound: false,
         alive: false,
-        padIndex,
-        pos: pad ? { ...pad.pos } : { x: 0, z: 0 },
-        yaw: pad?.yaw ?? 0,
+        pos: { x: 0, z: 0 },
+        yaw: 0,
         moving: false,
-        input: { seq: 0, moveX: 0, moveZ: 0, sprint: false, yaw: pad?.yaw ?? 0 },
+        input: { seq: 0, moveX: 0, moveZ: 0, sprint: false, yaw: 0 },
         lastSeq: 0,
         stats: emptyStats(),
       };
       this.players.set(player.id, player);
-      if (player.isBot && pad) {
+      if (player.isBot) {
         const diff = player.botDifficulty ?? 'NORMAL';
-        this.bots.set(player.id, new BotBrain(player.id, team, diff, pad.pos, this.arena, new Rng(this.rng.int(1, 1e9))));
+        this.bots.set(player.id, new BotBrain(player.id, team, diff, this.arena, new Rng(this.rng.int(1, 1e9))));
       }
     });
 
@@ -130,15 +127,12 @@ export class MatchSimulation {
 
     const canMove = this.mode.canMove();
     const canAim = this.mode.canAim();
-    const pads = canMove ? spawnPads(this.arena, this.players.size) : [];
     for (const p of this.players.values()) {
       p.moving = false;
       if (!p.alive || !p.inRound) continue;
       if (canAim) p.yaw = p.input.yaw;
       if (canMove) {
-        const pad = pads[p.padIndex];
-        if (!pad) continue;
-        const next = stepMovement(p.pos, p.input, dt, pad.pos, this.config.movement, this.arena);
+        const next = stepMovement(p.pos, p.input, dt, this.arena);
         p.moving = Math.hypot(next.x - p.pos.x, next.z - p.pos.z) > 1e-4;
         p.pos = next;
       }
@@ -194,7 +188,6 @@ export class MatchSimulation {
   private assignTeams(seeds: readonly PlayerSeed[]): { seed: PlayerSeed; team: TeamId }[] {
     if (this.config.mode !== 'TEAMS') return seeds.map((seed) => ({ seed, team: 0 }));
     const withTeams = seeds.map((seed, i) => ({ seed, team: (seed.team ? seed.team : (i % 2) + 1) as TeamId }));
-    // Team 1 takes the first half of the ring, team 2 the second half, so allies stand together.
-    return [...withTeams.filter((s) => s.team === 1), ...withTeams.filter((s) => s.team === 2)];
+    return withTeams;
   }
 }

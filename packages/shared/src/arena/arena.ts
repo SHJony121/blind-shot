@@ -1,37 +1,43 @@
-import { MAX_SHOT_RANGE, PLAYER_HIT_RADIUS } from '../constants/game';
-import { rayCircle, rayCircleExit } from '../math/raycast';
+import { MAX_SHOT_RANGE, PLAYER_HIT_RADIUS, SPAWN_SEPARATION, SPAWN_WALL_MARGIN } from '../constants/game';
+import { rayCircle } from '../math/raycast';
 import { dirToYaw, type Vec2 } from '../math/vec';
-import type { MapId } from '../types';
+import type { Rng } from '../util/rng';
+import type { MapId, TeamId } from '../types';
 
-export interface PillarDef {
+export interface CircleObstacle {
+  kind: 'circle';
   pos: Vec2;
   radius: number;
   height: number;
 }
 
+/** Axis-aligned box obstacle (half extents on X/Z). */
+export interface BoxObstacle {
+  kind: 'box';
+  pos: Vec2;
+  halfX: number;
+  halfZ: number;
+  height: number;
+}
+
+export type Obstacle = CircleObstacle | BoxObstacle;
+
+export type ArenaTheme = 'chamber' | 'factory' | 'cooling';
+
 /**
  * Gameplay geometry of an arena. Everything gameplay-relevant is 2D (XZ plane):
- * shots travel horizontally at muzzle height, so circles are exact enough and
- * identical on client and server.
+ * shots travel horizontally at muzzle height, so this is exact enough and identical
+ * on client and server. Arenas are open rectangles; subjects can stand anywhere.
  */
 export interface ArenaDef {
   id: MapId;
   name: string;
-  /** Walkable elevated platform. */
-  platformRadius: number;
-  /** Low railing at the platform edge (visual + ragdoll collider; bullets fly over it). */
-  railingRadius: number;
-  /** Chamber wall that stops bullets and lasers. */
-  wallRadius: number;
-  /** Radius of the ring of spawn pads. */
-  spawnRadius: number;
-  pillars: PillarDef[];
-}
-
-export interface SpawnPad {
-  index: number;
-  pos: Vec2;
-  yaw: number;
+  theme: ArenaTheme;
+  /** Walkable floor is [-halfX, halfX] × [-halfZ, halfZ]; walls stop bullets at the edge. */
+  halfX: number;
+  halfZ: number;
+  wallHeight: number;
+  obstacles: Obstacle[];
 }
 
 export interface RayTarget {
@@ -45,26 +51,65 @@ export interface RayHit {
   end: Vec2;
   targetId: string | null;
   surface: 'WALL' | 'PILLAR' | 'SUBJECT' | 'NONE';
+  /** Surface normal at the hit point (XZ). */
+  normal: Vec2;
 }
 
-/** Evenly spaced pads around the centre; every pad faces the centre. */
-export function spawnPads(arena: ArenaDef, count: number): SpawnPad[] {
-  const pads: SpawnPad[] = [];
-  const n = Math.max(1, count);
-  // Rotate the ring for counts where a pad would otherwise sit directly behind a pillar.
-  const offset = n === 8 || n === 7 ? Math.PI / n : 0;
-  for (let i = 0; i < n; i++) {
-    const a = offset + (i / n) * Math.PI * 2;
-    // Pad 0 sits at -Z (towards the default camera), then counter-clockwise.
-    const pos = { x: Math.sin(a + Math.PI) * arena.spawnRadius, z: Math.cos(a + Math.PI) * arena.spawnRadius };
-    pads.push({ index: i, pos, yaw: dirToYaw({ x: -pos.x, z: -pos.z }) });
+/** Ray (origin inside) against the arena's outer walls: distance to the exit point. */
+function rayWalls(arena: ArenaDef, o: Vec2, d: Vec2): { t: number; normal: Vec2 } {
+  let t = Infinity;
+  let normal: Vec2 = { x: 0, z: 0 };
+  if (d.x > 1e-9) {
+    const tx = (arena.halfX - o.x) / d.x;
+    if (tx < t) [t, normal] = [tx, { x: -1, z: 0 }];
+  } else if (d.x < -1e-9) {
+    const tx = (-arena.halfX - o.x) / d.x;
+    if (tx < t) [t, normal] = [tx, { x: 1, z: 0 }];
   }
-  return pads;
+  if (d.z > 1e-9) {
+    const tz = (arena.halfZ - o.z) / d.z;
+    if (tz < t) [t, normal] = [tz, { x: 0, z: -1 }];
+  } else if (d.z < -1e-9) {
+    const tz = (-arena.halfZ - o.z) / d.z;
+    if (tz < t) [t, normal] = [tz, { x: 0, z: 1 }];
+  }
+  return { t: Math.max(0, t), normal };
+}
+
+/** Ray against an axis-aligned box (slab method). Null when it misses or the box is behind. */
+function rayBox(o: Vec2, d: Vec2, b: BoxObstacle): { t: number; normal: Vec2 } | null {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  let normal: Vec2 = { x: 0, z: 0 };
+  for (const axis of ['x', 'z'] as const) {
+    const half = axis === 'x' ? b.halfX : b.halfZ;
+    const lo = b.pos[axis] - half;
+    const hi = b.pos[axis] + half;
+    if (Math.abs(d[axis]) < 1e-9) {
+      if (o[axis] < lo || o[axis] > hi) return null;
+      continue;
+    }
+    let t1 = (lo - o[axis]) / d[axis];
+    let t2 = (hi - o[axis]) / d[axis];
+    let sign = -1;
+    if (t1 > t2) {
+      [t1, t2] = [t2, t1];
+      sign = 1;
+    }
+    if (t1 > tmin) {
+      tmin = t1;
+      normal = axis === 'x' ? { x: sign, z: 0 } : { x: 0, z: sign };
+    }
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
+  if (tmax < 0) return null;
+  return { t: Math.max(0, tmin), normal };
 }
 
 /**
- * Cast a horizontal ray against the arena and a list of subjects.
- * Pure function — used for authoritative shots and for client-side laser rendering.
+ * Cast a horizontal ray against the arena (walls + obstacles) and a list of subjects.
+ * Pure — used for authoritative shots and for client-side laser rendering.
  */
 export function castRay(
   arena: ArenaDef,
@@ -73,15 +118,30 @@ export function castRay(
   targets: readonly RayTarget[],
   maxRange = MAX_SHOT_RANGE,
 ): RayHit {
-  let best = Math.min(maxRange, rayCircleExit(origin, dir, { x: 0, z: 0 }, arena.wallRadius));
+  const wall = rayWalls(arena, origin, dir);
+  let best = Math.min(maxRange, wall.t);
   let surface: RayHit['surface'] = best < maxRange ? 'WALL' : 'NONE';
+  let normal = wall.normal;
   let targetId: string | null = null;
 
-  for (const p of arena.pillars) {
-    const t = rayCircle(origin, dir, p.pos, p.radius);
-    if (t !== null && t < best) {
-      best = t;
-      surface = 'PILLAR';
+  for (const ob of arena.obstacles) {
+    if (ob.kind === 'circle') {
+      const t = rayCircle(origin, dir, ob.pos, ob.radius);
+      if (t !== null && t < best) {
+        best = t;
+        surface = 'PILLAR';
+        const hx = origin.x + dir.x * t - ob.pos.x;
+        const hz = origin.z + dir.z * t - ob.pos.z;
+        const l = Math.hypot(hx, hz) || 1;
+        normal = { x: hx / l, z: hz / l };
+      }
+    } else {
+      const hit = rayBox(origin, dir, ob);
+      if (hit && hit.t < best) {
+        best = hit.t;
+        surface = 'PILLAR';
+        normal = hit.normal;
+      }
     }
   }
   for (const target of targets) {
@@ -90,6 +150,7 @@ export function castRay(
       best = t;
       surface = 'SUBJECT';
       targetId = target.id;
+      normal = { x: -dir.x, z: -dir.z };
     }
   }
   return {
@@ -97,24 +158,172 @@ export function castRay(
     end: { x: origin.x + dir.x * best, z: origin.z + dir.z * best },
     targetId,
     surface,
+    normal,
   };
 }
 
+/** Push a circle of `radius` at `p` out of every obstacle and back inside the walls. */
+export function resolveCollisions(arena: ArenaDef, p: Vec2, radius: number): Vec2 {
+  let { x, z } = p;
+  for (const ob of arena.obstacles) {
+    if (ob.kind === 'circle') {
+      const dx = x - ob.pos.x;
+      const dz = z - ob.pos.z;
+      const d = Math.hypot(dx, dz);
+      const min = ob.radius + radius;
+      if (d < min && d > 1e-6) {
+        x = ob.pos.x + (dx / d) * min;
+        z = ob.pos.z + (dz / d) * min;
+      }
+    } else {
+      const cx = Math.max(ob.pos.x - ob.halfX, Math.min(x, ob.pos.x + ob.halfX));
+      const cz = Math.max(ob.pos.z - ob.halfZ, Math.min(z, ob.pos.z + ob.halfZ));
+      const dx = x - cx;
+      const dz = z - cz;
+      const d = Math.hypot(dx, dz);
+      if (d < radius) {
+        if (d > 1e-6) {
+          x = cx + (dx / d) * radius;
+          z = cz + (dz / d) * radius;
+        } else {
+          // Centre inside the box: push out along the shallowest axis.
+          const px = ob.halfX - Math.abs(x - ob.pos.x);
+          const pz = ob.halfZ - Math.abs(z - ob.pos.z);
+          if (px < pz) x = ob.pos.x + Math.sign(x - ob.pos.x || 1) * (ob.halfX + radius);
+          else z = ob.pos.z + Math.sign(z - ob.pos.z || 1) * (ob.halfZ + radius);
+        }
+      }
+    }
+  }
+  x = Math.max(-arena.halfX + radius, Math.min(arena.halfX - radius, x));
+  z = Math.max(-arena.halfZ + radius, Math.min(arena.halfZ - radius, z));
+  return { x, z };
+}
+
+function clearOfObstacles(arena: ArenaDef, p: Vec2, clearance: number): boolean {
+  return arena.obstacles.every((ob) => {
+    if (ob.kind === 'circle') return Math.hypot(p.x - ob.pos.x, p.z - ob.pos.z) > ob.radius + clearance;
+    return Math.abs(p.x - ob.pos.x) > ob.halfX + clearance || Math.abs(p.z - ob.pos.z) > ob.halfZ + clearance;
+  });
+}
+
+export interface SpawnPoint {
+  pos: Vec2;
+  yaw: number;
+}
+
+/**
+ * Random, well-separated spawn points anywhere on the floor. In TEAMS mode team 1 spawns
+ * on the -X half and team 2 on the +X half. Everyone initially faces the arena centre.
+ */
+export function randomSpawns(arena: ArenaDef, teams: readonly TeamId[], rng: Rng): SpawnPoint[] {
+  const placed: Vec2[] = [];
+  const out: SpawnPoint[] = [];
+  const mx = arena.halfX - SPAWN_WALL_MARGIN;
+  const mz = arena.halfZ - SPAWN_WALL_MARGIN;
+  for (const team of teams) {
+    let best: Vec2 = { x: 0, z: 0 };
+    let bestScore = -Infinity;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      let x = rng.range(-mx, mx);
+      if (team === 1) x = -Math.abs(x) * 0.85 - 1;
+      if (team === 2) x = Math.abs(x) * 0.85 + 1;
+      const p = { x, z: rng.range(-mz, mz) };
+      if (!clearOfObstacles(arena, p, 1.2)) continue;
+      const nearest = placed.reduce((m, q) => Math.min(m, Math.hypot(p.x - q.x, p.z - q.z)), Infinity);
+      if (nearest >= SPAWN_SEPARATION) {
+        best = p;
+        bestScore = Infinity;
+        break;
+      }
+      if (nearest > bestScore) {
+        best = p;
+        bestScore = nearest;
+      }
+    }
+    placed.push(best);
+    const toCentre = { x: -best.x, z: -best.z };
+    out.push({ pos: best, yaw: Math.hypot(toCentre.x, toCentre.z) > 0.1 ? dirToYaw(toCentre) : 0 });
+  }
+  return out;
+}
+
+const circle = (x: number, z: number, radius: number, height = 3): CircleObstacle => ({
+  kind: 'circle',
+  pos: { x, z },
+  radius,
+  height,
+});
+const box = (x: number, z: number, halfX: number, halfZ: number, height = 2.2): BoxObstacle => ({
+  kind: 'box',
+  pos: { x, z },
+  halfX,
+  halfZ,
+  height,
+});
+
+/** Big open square test floor with four pillars and two low blocks for cover. */
 export const TEST_CHAMBER_01: ArenaDef = {
   id: 'TEST_CHAMBER_01',
   name: 'TEST CHAMBER 01',
-  platformRadius: 9,
-  railingRadius: 9.15,
-  wallRadius: 14,
-  spawnRadius: 6.4,
-  pillars: [0, 1, 2, 3].map((i) => {
-    const a = Math.PI / 4 + (i * Math.PI) / 2;
-    return { pos: { x: Math.sin(a) * 3.4, z: Math.cos(a) * 3.4 }, radius: 0.55, height: 2.4 };
-  }),
+  theme: 'chamber',
+  halfX: 14,
+  halfZ: 14,
+  wallHeight: 9,
+  obstacles: [
+    circle(-6, -6, 0.75),
+    circle(6, -6, 0.75),
+    circle(-6, 6, 0.75),
+    circle(6, 6, 0.75),
+    box(0, -9.5, 1.6, 0.6, 1.6),
+    box(0, 9.5, 1.6, 0.6, 1.6),
+  ],
 };
 
-const ARENAS: Record<MapId, ArenaDef> = {
+/** Long factory hall with crates and machinery to hide behind. */
+export const FACTORY_FLOOR: ArenaDef = {
+  id: 'FACTORY_FLOOR',
+  name: 'FACTORY FLOOR',
+  theme: 'factory',
+  halfX: 18,
+  halfZ: 13,
+  wallHeight: 10,
+  obstacles: [
+    box(-9, 5, 1.2, 1.2),
+    box(-6.6, 5, 1.0, 1.0, 1.6),
+    box(8, -5, 1.5, 1.1),
+    box(0, 0, 3.6, 0.7, 1.3),
+    box(-4, -8, 1.1, 1.1),
+    box(11, 7, 1.0, 1.6),
+    box(4, 8.5, 0.9, 0.9, 1.6),
+    circle(-13, -3, 0.8, 6),
+    circle(13.5, -1, 0.8, 6),
+  ],
+};
+
+/** Square reactor cooling room: big round tanks and a central core. */
+export const COOLING_ROOM: ArenaDef = {
+  id: 'COOLING_ROOM',
+  name: 'COOLING ROOM',
+  theme: 'cooling',
+  halfX: 15,
+  halfZ: 15,
+  wallHeight: 10,
+  obstacles: [
+    circle(0, 0, 2.1, 5),
+    circle(-8.5, -8.5, 1.5, 4),
+    circle(8.5, 8.5, 1.5, 4),
+    circle(-8.5, 8.5, 1.1, 3.5),
+    circle(8.5, -8.5, 1.1, 3.5),
+    box(-11.5, 0, 0.6, 2.2, 1.4),
+    box(11.5, 0, 0.6, 2.2, 1.4),
+  ],
+};
+
+export const ARENAS: Record<MapId, ArenaDef> = {
   TEST_CHAMBER_01,
+  FACTORY_FLOOR,
+  COOLING_ROOM,
 };
 
-export const getArena = (id: MapId): ArenaDef => ARENAS[id];
+export const getArena = (id: MapId): ArenaDef => ARENAS[id] ?? TEST_CHAMBER_01;

@@ -20,7 +20,7 @@ for (const diff of ['EASY', 'NORMAL', 'HARD'] as BotDifficulty[]) {
       sim.tick(1 / 30);
       for (const e of sim.drainEvents()) {
         if (e.type === 'roundEnded') rounds++;
-        if (e.type === 'shootout') volleys++;
+        if (e.type === 'phaseChanged' && e.data.phase === 'SHOOTING') volleys++;
       }
     }
     time += sim.time;

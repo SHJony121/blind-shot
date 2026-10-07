@@ -6,6 +6,8 @@ import { Ragdoll } from './Ragdoll';
 import { SubjectModel, type SubjectLook } from './SubjectModel';
 import { canvasTexture, roundRect } from './textures';
 
+const ringGeo = new THREE.RingGeometry(0.62, 0.8, 36);
+
 interface Sample {
   t: number;
   pos: Vec2;
@@ -23,6 +25,7 @@ export class SubjectView {
   readonly model: SubjectModel;
   readonly laser: LaserSight;
   readonly tag: THREE.Sprite;
+  private readonly ring: THREE.Mesh;
   presence: Presence = 'visible';
   ghost = false;
   ragdoll: Ragdoll | null = null;
@@ -48,6 +51,14 @@ export class SubjectView {
     this.tag = makeNameTag(label, look.accentColor, isLocal);
     this.tag.position.y = 2.85;
     this.model.root.add(this.tag);
+    // Coloured ring under the feet: instantly tells subjects apart on a big floor.
+    this.ring = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({ color: isLocal ? '#e3b23c' : look.bodyColor, transparent: true, opacity: 0.85, depthWrite: false }),
+    );
+    this.ring.rotation.x = -Math.PI / 2;
+    this.ring.position.y = 0.03;
+    this.model.root.add(this.ring);
     scene.add(this.model.root, this.laser.group);
   }
 
@@ -121,6 +132,7 @@ export class SubjectView {
   kill(physics: PhysicsWorld | null, dir: THREE.Vector3, strength: number): void {
     this.laser.setActive(false);
     this.tag.visible = false;
+    this.ring.visible = false;
     if (!physics || this.ragdoll) return;
     this.ragdoll = new Ragdoll(physics, this.model, dir, strength);
   }
@@ -152,6 +164,7 @@ export class SubjectView {
     this.ragdoll = null;
     this.laser.dispose();
     this.tag.material.dispose();
+    (this.ring.material as THREE.Material).dispose();
     this.model.dispose();
     this.scene.remove(this.model.root);
   }

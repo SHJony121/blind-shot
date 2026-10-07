@@ -6,7 +6,7 @@
  * checks that hidden enemies never appear in a snapshot and that shootouts resolve.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { ClientToServerEvents, MatchView, RoomState, ServerToClientEvents, ShootoutEvent } from '@blindshot/shared';
+import type { ClientToServerEvents, MatchView, RoomState, ServerToClientEvents, ShotFiredEvent } from '@blindshot/shared';
 
 type S = Socket<ServerToClientEvents, ClientToServerEvents>;
 const URL = process.env.SERVER_URL ?? 'http://localhost:3001';
@@ -30,7 +30,7 @@ async function main() {
   const idB = await hello(b, 'Bravo');
 
   const room = await new Promise<RoomState>((resolve, reject) =>
-    a.emit('createRoom', { visibleSeconds: 2, blindSeconds: 2, roundsToWin: 1 }, (r) => (r.ok ? resolve(r.data) : reject(new Error(r.error)))),
+    a.emit('createRoom', { visibleSeconds: 2, blindSeconds: 3, roundsToWin: 1 }, (r) => (r.ok ? resolve(r.data) : reject(new Error(r.error)))),
   );
   console.log(`room ${room.code} created`);
   await new Promise<RoomState>((resolve, reject) =>
@@ -43,16 +43,16 @@ async function main() {
   let blindViews = 0;
   let shootouts = 0;
   const check = (viewer: string) => (v: MatchView) => {
-    if (v.phase === 'BLIND' || v.phase === 'COUNTDOWN') {
+    if (v.phase === 'HIDE' || v.phase === 'COUNTDOWN') {
       blindViews++;
       for (const body of v.bodies) if (body.id !== viewer && body.alive) leaks++;
     }
   };
   a.on('snapshot', check(idA));
   b.on('snapshot', check(idB));
-  a.on('shootout', (e: ShootoutEvent) => {
-    shootouts++;
-    console.log(`shootout r${e.round}s${e.shot}: ${e.shots.length} shots, eliminated ${e.eliminated.length}`);
+  a.on('shotFired', (e: ShotFiredEvent) => {
+    if (e.index === 0) shootouts++;
+    console.log(`r${e.round}s${e.shot} shot ${e.index + 1}/${e.total}: ${e.result.hitPlayerId ? 'HIT' : 'miss'}`);
   });
   const ended = new Promise<void>((resolve) => a.on('matchEnded', () => resolve()));
   // Keep inputs flowing like a real client would.

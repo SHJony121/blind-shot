@@ -62,26 +62,25 @@ The same `MatchSimulation` runs inside the browser for solo play and inside the 
 
 ## 4. Round state machine
 
+> Updated after the first playtest: the hidden phase became a 5..1 "players revealed in" countdown, followed by a freeze and shots fired one by one.
+
 A **match** is first-to-N round wins (default 3, i.e. best of 5).
-A **round** is played until one subject (or team) remains. It is made of one or more **shots** (volleys); every alive subject fires exactly **once per shot**. Most rounds take 1–3 shots ≈ 15–40 s (measured with `packages/shared/src/tests/balance.ts`).
+A **round** is played until one subject (or team) remains. It is made of one or more **volleys**, and every alive subject fires at most **once per volley**.
 
 ```
-ROUND_INTRO (1.6s, "ROUND 03 / BLIND SHOT / MEMORIZE YOUR TARGET")
-  → SPAWN (0.6s, subjects drop onto pads)            [first shot of the round only]
-  → VISIBLE (5s, "AIM. MEMORIZE.", lasers on)
-  → HIDE (0.7s, warning tone, flicker, "VISUAL FEED DISABLED")
-  → BLIND (0.8s, "TARGETS HIDDEN")
-  → COUNTDOWN (3s, "SHOOTOUT IN 3·2·1")
-  → FIRE (instant: snapshot + two-step resolution)
-  → RESOLUTION (1.2s, flashes, tracers, ragdolls)
-  → REVEAL (1.5s, everyone visible, "2 SURVIVORS")
-      ├─ >1 side alive → next shot: VISIBLE (shot counter +1)
-      └─ ≤1 side alive → ROUND_RESULTS (3s, "SUBJECT 02 WINS / NEXT ROUND IN 3")
-           ├─ someone reached N wins → MATCH_END
-           └─ else → ROUND_INTRO
+ROUND_INTRO (1.8s, "ROUND 03 / BLIND SHOT / MEMORIZE YOUR TARGET")
+  → SPAWN (0.7s, subjects drop in at random spots)       [first volley of the round only]
+  → VISIBLE (5s, "AIM.", lasers on, free movement)
+  → HIDE (0.7s, warning tone, flicker, "TARGETS HIDDEN")
+  → COUNTDOWN (5s, enemies hidden, popup "PLAYERS REVEALED IN 5..1", move + aim allowed)
+  → FREEZE (1.3s, everyone revealed, no movement, aims locked, all lasers shown)
+  → SHOOTING (one by one in random order, 0.85s apart; or all at once)
+  → REVEAL (1.6s, "HIT!", "EVERYBODY MISSED", "2 SURVIVORS"…)
+      ├─ >1 side alive → next volley: VISIBLE
+      └─ ≤1 side alive → ROUND_RESULTS → next ROUND_INTRO, or MATCH_END
 ```
 
-Visible / blind durations are host-configurable. If a round reaches 6 shots without a winner, it is a draw. All transitions live in one table in `BlindShotMode`; nothing else changes phase.
+All transitions live in `BlindShotMode.advance()`.
 
 ## 5. Player data model
 

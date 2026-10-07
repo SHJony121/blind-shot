@@ -9,7 +9,6 @@ import {
   TEAM_COLORS,
   angleDiff,
   dirToYaw,
-  spawnPads,
   stepMovement,
   wrapAngle,
   type BodyState,
@@ -18,8 +17,7 @@ import {
   type PlayerInfo,
   type PlayerInput,
   type RayTarget,
-  type ShootoutEvent,
-  type SpawnPad,
+  type ShotFiredEvent,
   type Vec2,
 } from '@blindshot/shared';
 import { audio } from '../audio/AudioEngine';
@@ -53,8 +51,8 @@ export class GameController {
   private readonly disposers: (() => void)[] = [];
   private view: MatchView | null = null;
   private viewReceivedAt = 0;
-  private pads: SpawnPad[] = [];
-  private padSignature = '';
+  /** Subjects that already fired in the current volley (their laser switches off). */
+  private fired = new Set<string>();
   private clock = 0;
   private timeline: Scheduled[] = [];
   private paused = false;
@@ -77,12 +75,11 @@ export class GameController {
     private readonly session: GameSession,
     roomCode: string | null = null,
   ) {
-    this.presenter = new BlindShotPresenter(world.chamber, (d, fn) => this.schedule(d, fn), session.localId);
+    this.presenter = new BlindShotPresenter(() => world.chamber, (d, fn) => this.schedule(d, fn), session.localId);
     hudStore.set({ ...initialHud(), active: true, online: session.online, localId: session.localId, roomCode });
     world.cameraRig.mode = 'player';
     world.cameraTarget = () => ({
-      subject: this.renderedLocal(),
-      pad: this.localPad(),
+      subject: this.view ? this.renderedLocal() : null,
       aim: this.aimPoint,
     });
     this.disposers.push(world.addUpdate((dt) => this.update(dt)));
@@ -125,8 +122,8 @@ export class GameController {
     this.world.input.exitPointerLock();
     this.world.input.setEnabled(true);
     this.world.cameraRig.mode = 'menu';
-    this.world.cameraTarget = () => ({ subject: null, pad: null, aim: null });
-    this.world.chamber.setPads([], []);
+    this.world.cameraTarget = () => ({ subject: null, aim: null });
+    this.world.setArena('TEST_CHAMBER_01');
     this.world.chamber.setMood('menu');
     this.world.chamber.setDisplay('TEST CHAMBER 01', 'SUBJECTS STAND BY');
     this.world.effects.clearDecals();
@@ -142,7 +139,11 @@ export class GameController {
     this.viewReceivedAt = performance.now() / 1000;
     this.roster.clear();
     for (const p of view.roster) this.roster.set(p.id, p);
-    this.refreshPads(view);
+    // First view of a match: build the right arena before any subject exists.
+    if (view.config.mapId !== this.world.arena.id && this.views.size === 0) {
+      this.world.setArena(view.config.mapId);
+      this.world.chamber.setMood('normal');
+    }
 
     const present = new Set<string>();
     for (const body of view.bodies) {
@@ -162,11 +163,10 @@ export class GameController {
     // Local reconciliation: rewind to the authoritative position, replay unacknowledged inputs.
     const me = view.bodies.find((b) => b.id === this.session.localId);
     this.localAlive = !!me?.alive;
-    if (me && me.alive && MOVE_PHASES.has(view.phase) && view.config.movement === 'LIGHT') {
+    if (me && me.alive && MOVE_PHASES.has(view.phase)) {
       this.pending = this.pending.filter((i) => i.seq > view.ackSeq);
-      const pad = this.localPad();
       let p: Vec2 = { ...me.pos };
-      if (pad) for (const input of this.pending) p = stepMovement(p, input, STEP, pad, view.config.movement, this.world.arena);
+      for (const input of this.pending) p = stepMovement(p, input, STEP, this.world.arena);
       this.error.x += this.predicted.x - p.x;
       this.error.z += this.predicted.z - p.z;
       if (Math.hypot(this.error.x, this.error.z) > 1.5) this.error = { x: 0, z: 0 };
@@ -202,6 +202,8 @@ export class GameController {
     switch (e.type) {
       case 'phaseChanged':
         if (e.data.phase === 'ROUND_INTRO') this.resetForRound();
+        if (e.data.phase === 'FREEZE' || e.data.phase === 'VISIBLE') this.fired.clear();
+        if (e.data.phase === 'FREEZE') this.revealAll();
         if (e.data.phase === 'SPAWN') this.dropInSubjects();
         if (e.data.phase === 'VISIBLE' && e.data.round === 1 && e.data.shot === 1) {
           hudStore.set({ hintsVisible: true });
@@ -209,9 +211,9 @@ export class GameController {
         }
         this.presenter.onPhase(e.data, [...this.roster.values()]);
         break;
-      case 'shootout':
-        this.presenter.onShootout(e.data);
-        this.playShootout(e.data);
+      case 'shotFired':
+        this.presenter.onShot(e.data);
+        this.playShot(e.data);
         break;
       case 'roundEnded': {
         hudStore.set({ roundResult: e.data, roster: e.data.roster });
@@ -276,7 +278,8 @@ export class GameController {
       const alive = this.roster.get(sv.id)?.alive ?? false;
       let laser = 0;
       if (alive && !sv.ragdoll && sv.presence === 'visible') {
-        if (view.phase === 'VISIBLE') laser = sv.ghost ? 0.3 : 1;
+        if (view.phase === 'VISIBLE' || view.phase === 'FREEZE') laser = sv.ghost ? 0.3 : 1;
+        else if (view.phase === 'SHOOTING') laser = this.fired.has(sv.id) ? 0 : 1;
         else if (hidden) laser = sv.id === localId ? 1 : sv.ghost ? 0.3 : 0;
       }
       sv.laser.setActive(laser > 0, laser);
@@ -289,7 +292,7 @@ export class GameController {
   private sampleLocalInput(dt: number, view: MatchView): void {
     const settings = settingsStore.get();
     const canAim = this.localAlive && AIM_PHASES.has(view.phase) && !this.paused;
-    const canMove = canAim && view.config.movement === 'LIGHT';
+    const canMove = canAim;
     const input = this.world.input;
     const me = this.renderedLocal();
 
@@ -330,9 +333,8 @@ export class GameController {
         yaw: this.aimYaw,
       };
       if (canMove) {
-        const pad = this.localPad();
         this.prevPredicted = { ...this.predicted };
-        if (pad) this.predicted = stepMovement(this.predicted, cmd, STEP, pad, view.config.movement, this.world.arena);
+        this.predicted = stepMovement(this.predicted, cmd, STEP, this.world.arena);
         this.pending.push(cmd);
         if (this.pending.length > 90) this.pending.shift();
       }
@@ -343,81 +345,66 @@ export class GameController {
   // ---------------------------------------------------------------------------
   // Shootout
 
-  private playShootout(e: ShootoutEvent): void {
-    const localId = this.session.localId;
-    // Reveal: everyone who was alive is shown at their true position, right now.
-    for (const body of e.revealed) {
-      const sv = this.ensureView(body.id);
-      if (!sv) continue;
-      sv.reveal();
-      sv.setGhost(false);
-      sv.snap(body.pos, body.yaw, this.view?.time);
-      if (body.id === localId) {
-        this.predicted = { ...body.pos };
-        this.prevPredicted = { ...body.pos };
-        this.aimYaw = body.yaw;
-        this.pending = [];
-      }
-    }
+  /** FREEZE: everyone is shown where they really are, frozen, with their locked aim. */
+  private revealAll(): void {
+    // Hidden subjects re-appear (snapped to their true spot) when the next snapshot lists them.
+    for (const sv of this.views.values()) if (sv.presence === 'fading') sv.hideNow();
+    this.world.chamber.flash(0.6);
+    audio.reveal();
+  }
 
+  /** One bullet. In SEQUENTIAL order these arrive one at a time, so every shot gets its moment. */
+  private playShot(e: ShotFiredEvent): void {
+    const shot = e.result;
+    const localId = this.session.localId;
     const fx = this.world.effects;
     const cam = this.world.engine.camera;
-    this.world.chamber.flash(1);
-    fx.shake(0.6);
-    hudStore.set({ flashId: hudStore.get().flashId + 1 });
-    audio.gunshot(0, 4, 0, 1.15);
+    this.fired.add(shot.shooterId);
 
-    for (const shot of e.shots) {
-      const sv = this.views.get(shot.shooterId);
-      sv?.model.fire();
-      const origin = new THREE.Vector3(shot.origin.x, MUZZLE_HEIGHT, shot.origin.z);
-      const dir = new THREE.Vector3(shot.dir.x, 0, shot.dir.z);
-      const end = new THREE.Vector3(shot.end.x, MUZZLE_HEIGHT, shot.end.z);
-      fx.muzzleFlash(origin, dir);
-      fx.tracer(origin, end);
-      const pan = this.panFor(origin, cam);
-      audio.gunshot(pan, origin.distanceTo(cam.position), 0.006 + Math.random() * 0.03, 0.55);
-      if (shot.hitSurface === 'WALL' || shot.hitSurface === 'PILLAR') {
-        const normal =
-          shot.hitSurface === 'WALL'
-            ? new THREE.Vector3(-shot.end.x, 0, -shot.end.z).normalize()
-            : this.pillarNormal(shot.end);
-        this.schedule(0.04, () => {
-          fx.wallImpact(end, normal);
-          audio.metalImpact(this.panFor(end, cam));
+    const sv = this.views.get(shot.shooterId);
+    sv?.model.fire();
+    const origin = new THREE.Vector3(shot.origin.x, MUZZLE_HEIGHT, shot.origin.z);
+    const dir = new THREE.Vector3(shot.dir.x, 0, shot.dir.z);
+    const end = new THREE.Vector3(shot.end.x, MUZZLE_HEIGHT, shot.end.z);
+    fx.muzzleFlash(origin, dir);
+    fx.tracer(origin, end);
+    this.world.chamber.flash(e.simultaneous ? 1 : 0.7);
+    // One big bang per volley in SIMULTANEOUS order, a full shot each in SEQUENTIAL order.
+    if (!e.simultaneous || e.index === 0) {
+      fx.shake(e.simultaneous ? 0.6 : 0.42);
+      hudStore.set({ flashId: hudStore.get().flashId + 1 });
+      audio.gunshot(this.panFor(origin, cam), origin.distanceTo(cam.position), 0, e.simultaneous ? 1.2 : 1);
+    } else {
+      audio.gunshot(this.panFor(origin, cam), origin.distanceTo(cam.position), 0.006 + Math.random() * 0.03, 0.5);
+    }
+
+    if (shot.hitSurface === 'WALL' || shot.hitSurface === 'PILLAR') {
+      const normal = new THREE.Vector3(shot.normal.x, 0, shot.normal.z);
+      this.schedule(0.04, () => {
+        fx.wallImpact(end, normal);
+        audio.metalImpact(this.panFor(end, cam));
+      });
+    }
+
+    for (const id of e.eliminated) {
+      this.dying.add(id);
+      const victim = this.views.get(id);
+      const info = this.roster.get(id);
+      if (!victim) continue;
+      this.schedule(0.06, () => {
+        victim.model.flashHit();
+        fx.subjectHit(new THREE.Vector3(victim.pos.x, 1.3, victim.pos.z), dir.clone(), info ? this.bodyColor(info) : '#ffffff');
+        audio.bodyHit(this.panFor(new THREE.Vector3(victim.pos.x, 1, victim.pos.z), cam));
+        fx.shake(0.3);
+        this.schedule(0.05, () => victim.kill(this.world.physics, dir.clone(), 1.2));
+      });
+      if (id === localId) {
+        this.schedule(1.4, () => {
+          this.dying.delete(localId);
+          hudStore.set({ spectating: true });
+          this.world.cameraRig.mode = 'spectate';
         });
       }
-    }
-
-    // Hits land a beat after the flash, then bodies fly.
-    const impulses = new Map<string, THREE.Vector3>();
-    for (const shot of e.shots) {
-      if (!shot.hitPlayerId) continue;
-      const acc = impulses.get(shot.hitPlayerId) ?? new THREE.Vector3();
-      acc.add(new THREE.Vector3(shot.dir.x, 0, shot.dir.z));
-      impulses.set(shot.hitPlayerId, acc);
-    }
-    for (const id of e.eliminated) this.dying.add(id);
-    this.schedule(0.07, () => {
-      for (const id of e.eliminated) {
-        const sv = this.views.get(id);
-        const info = this.roster.get(id);
-        if (!sv) continue;
-        const dir = impulses.get(id) ?? new THREE.Vector3(0, 0, 1);
-        const strength = Math.min(1.8, 0.9 + dir.length() * 0.3);
-        sv.model.flashHit();
-        fx.subjectHit(new THREE.Vector3(sv.pos.x, 1.3, sv.pos.z), dir.clone().normalize(), info ? this.bodyColor(info) : '#ffffff');
-        audio.bodyHit(this.panFor(new THREE.Vector3(sv.pos.x, 1, sv.pos.z), cam));
-        this.schedule(0.05, () => sv.kill(this.world.physics, dir.normalize(), strength));
-      }
-      if (e.eliminated.length > 0) fx.shake(0.35);
-    });
-    if (e.eliminated.includes(localId)) {
-      this.schedule(1.4, () => {
-        this.dying.delete(localId);
-        hudStore.set({ spectating: true });
-        this.world.cameraRig.mode = 'spectate';
-      });
     }
   }
 
@@ -501,22 +488,6 @@ export class GameController {
     }
   }
 
-  private refreshPads(view: MatchView): void {
-    const signature = `${view.roster.length}:${view.config.mode}`;
-    if (signature === this.padSignature) return;
-    this.padSignature = signature;
-    this.pads = spawnPads(this.world.arena, view.roster.length);
-    const colors: string[] = [];
-    for (const p of view.roster) colors[p.padIndex] = this.bodyColor(p);
-    this.world.chamber.setPads(this.pads, colors);
-  }
-
-  private localPad(): Vec2 | null {
-    const info = this.roster.get(this.session.localId);
-    if (!info) return null;
-    return this.pads[info.padIndex]?.pos ?? null;
-  }
-
   private renderedLocal(): Vec2 | null {
     if (!this.view) return null;
     const t = Math.min(1, this.inputAcc / STEP);
@@ -566,20 +537,6 @@ export class GameController {
   private panFor(p: THREE.Vector3, cam: THREE.Camera): number {
     v3.copy(p).applyMatrix4(cam.matrixWorldInverse);
     return Math.max(-1, Math.min(1, v3.x / 9));
-  }
-
-  private pillarNormal(end: Vec2): THREE.Vector3 {
-    let best = this.world.arena.pillars[0];
-    let bestD = Infinity;
-    for (const p of this.world.arena.pillars) {
-      const d = Math.hypot(end.x - p.pos.x, end.z - p.pos.z);
-      if (d < bestD) {
-        bestD = d;
-        best = p;
-      }
-    }
-    if (!best) return new THREE.Vector3(0, 0, 1);
-    return new THREE.Vector3(end.x - best.pos.x, 0, end.z - best.pos.z).normalize();
   }
 
   private schedule(delay: number, fn: () => void): void {

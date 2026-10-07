@@ -1,6 +1,6 @@
-import { subjectLabel, TEAM_NAMES, type PhaseChangedEvent, type PlayerInfo, type ShootoutEvent } from '@blindshot/shared';
+import { subjectLabel, TEAM_NAMES, type PhaseChangedEvent, type PlayerInfo, type ShotFiredEvent } from '@blindshot/shared';
 import { audio } from '../../audio/AudioEngine';
-import type { TestChamber } from '../../maps/TestChamber';
+import type { ArenaView } from '../../maps/ArenaView';
 import { clearBanner, hudStore, showBanner, type RevealSummary } from '../../../state/hud';
 
 type Schedule = (delay: number, fn: () => void) => void;
@@ -8,28 +8,30 @@ type Schedule = (delay: number, fn: () => void) => void;
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /**
- * Presentation of the Blind Shot round state machine: banners, chamber lighting,
+ * Presentation of the Blind Shot round state machine: banners, popups, chamber lighting,
  * wall displays and phase sounds. Purely reactive — it never changes game state.
  */
 export class BlindShotPresenter {
   private lastCountdown = 0;
   private warned = false;
   private heartbeatIn = 0;
-  private lastShootout: ShootoutEvent | null = null;
+  private volley: ShotFiredEvent[] = [];
+  private roster: readonly PlayerInfo[] = [];
 
   constructor(
-    private readonly chamber: TestChamber,
+    private readonly chamber: () => ArenaView,
     private readonly schedule: Schedule,
     private readonly localId: string,
   ) {}
 
   onPhase(e: PhaseChangedEvent, roster: readonly PlayerInfo[]): void {
-    const c = this.chamber;
+    const c = this.chamber();
+    this.roster = roster;
     switch (e.phase) {
       case 'ROUND_INTRO':
         c.setMood('normal');
         c.setDisplay(`ROUND ${pad2(e.round)}`, 'TEST BEGINNING');
-        hudStore.set({ roundResult: null, reveal: null });
+        hudStore.set({ roundResult: null, reveal: null, popup: null });
         showBanner(`ROUND ${pad2(e.round)}`, { size: 'xl' });
         audio.whoosh();
         this.schedule(0.6, () => showBanner('BLIND SHOT', { size: 'xl', tone: 'info' }));
@@ -41,10 +43,11 @@ export class BlindShotPresenter {
         break;
       case 'VISIBLE':
         this.warned = false;
+        this.volley = [];
         c.setMood('normal');
         c.setDisplay('MEMORIZE', e.shot > 1 ? `SHOT ${e.shot}` : 'TARGETS VISIBLE');
         showBanner('AIM.', { subtitle: e.shot > 1 ? `SHOT ${e.shot} · MEMORIZE THEIR POSITIONS` : 'MEMORIZE THEIR POSITIONS', size: 'lg' });
-        hudStore.set({ reveal: null });
+        hudStore.set({ reveal: null, popup: null });
         audio.setLaserHum(true);
         break;
       case 'HIDE':
@@ -53,19 +56,22 @@ export class BlindShotPresenter {
         c.flicker(0.45);
         c.setMood('blind');
         c.setDisplay('BLIND', 'VISUAL FEED DISABLED', '#ff4b3a');
-        showBanner('VISUAL FEED DISABLED', { tone: 'danger', size: 'lg' });
-        break;
-      case 'BLIND':
-        showBanner('TARGETS HIDDEN', { subtitle: 'REMEMBER WHERE THEY WERE', tone: 'danger', size: 'lg' });
-        this.heartbeatIn = 0;
+        showBanner('TARGETS HIDDEN', { subtitle: 'MOVE. AIM. REMEMBER WHERE THEY WERE.', tone: 'danger', size: 'lg' });
+        this.heartbeatIn = 0.4;
         break;
       case 'COUNTDOWN':
         this.lastCountdown = 0;
         c.setMood('alert');
         break;
-      case 'FIRE':
-        clearBanner();
+      case 'FREEZE':
+        hudStore.set({ popup: null, countdown: null });
         c.setMood('normal');
+        c.setDisplay('FREEZE', 'AIMS LOCKED', '#ffffff');
+        showBanner('FREEZE!', { subtitle: 'AIMS LOCKED · NOBODY MOVES', size: 'xl', tone: 'info' });
+        audio.freeze();
+        break;
+      case 'SHOOTING':
+        clearBanner();
         c.setDisplay('FIRE', '', '#ffffff');
         break;
       case 'REVEAL': {
@@ -90,22 +96,34 @@ export class BlindShotPresenter {
     }
   }
 
-  onShootout(e: ShootoutEvent): void {
-    this.lastShootout = e;
+  onShot(e: ShotFiredEvent): void {
+    this.volley.push(e);
+    if (e.simultaneous) return;
+    const shooter = this.roster.find((p) => p.id === e.result.shooterId);
+    const who = e.result.shooterId === this.localId ? 'YOU' : shooter ? subjectLabel(shooter.subject) : 'A SUBJECT';
+    const hit = e.eliminated[0];
+    const victim = hit ? this.roster.find((p) => p.id === hit) : undefined;
+    const victimName = hit === this.localId ? 'YOU' : victim ? subjectLabel(victim.subject) : '';
+    showBanner(hit ? 'HIT!' : 'MISS', {
+      subtitle: hit ? `${who} → ${victimName}` : `${who} FIRED`,
+      size: 'md',
+      tone: hit ? 'danger' : 'neutral',
+    });
   }
 
-  /** Per-frame: countdown ticks, pre-hide warning, blind heartbeat. */
+  /** Per-frame: countdown popup ticks, pre-hide warning, blind heartbeat. */
   tick(dt: number, phase: string, timeLeft: number): void {
+    const c = this.chamber();
     if (phase === 'VISIBLE' && !this.warned && timeLeft < 0.65) {
       this.warned = true;
       audio.warning();
-      this.chamber.flicker(0.12);
+      c.flicker(0.12);
     }
-    if (phase === 'BLIND' || phase === 'COUNTDOWN') {
+    if (phase === 'HIDE' || phase === 'COUNTDOWN') {
       this.heartbeatIn -= dt;
       if (this.heartbeatIn <= 0) {
         audio.heartbeat();
-        this.heartbeatIn = phase === 'COUNTDOWN' ? 0.55 : 0.8;
+        this.heartbeatIn = phase === 'COUNTDOWN' && timeLeft < 2.5 ? 0.5 : 0.8;
       }
     }
     if (phase === 'COUNTDOWN') {
@@ -113,19 +131,15 @@ export class BlindShotPresenter {
       if (n !== this.lastCountdown) {
         this.lastCountdown = n;
         audio.countdownBeep(n);
-        this.chamber.pulse();
-        this.chamber.setDisplay(`SHOOTOUT IN ${n}`, '', '#ff4b3a');
-        showBanner(String(n), { subtitle: 'SHOOTOUT IN', tone: 'danger', size: 'xl' });
-        hudStore.set({ countdown: n });
+        c.pulse();
+        c.setDisplay(`REVEAL IN ${n}`, 'THEN EVERYONE FREEZES', '#ff4b3a');
+        hudStore.set({ countdown: n, popup: { id: Date.now(), title: 'PLAYERS REVEALED IN', value: String(n) } });
       }
-    } else if (hudStore.get().countdown !== null) {
-      hudStore.set({ countdown: null });
     }
   }
 
   /** Turn the last volley into the line that makes people laugh. */
   private revealSummary(roster: readonly PlayerInfo[]): RevealSummary {
-    const e = this.lastShootout;
     const byId = new Map(roster.map((p) => [p.id, p]));
     const label = (id: string) => {
       const p = byId.get(id);
@@ -134,28 +148,23 @@ export class BlindShotPresenter {
     };
     const alive = roster.filter((p) => p.alive && p.inRound);
     const survivors = `${alive.length} SURVIVOR${alive.length === 1 ? '' : 'S'}`;
-    if (!e) return { headline: survivors };
+    const shots = this.volley.map((v) => v.result);
+    if (shots.length === 0) return { headline: survivors };
 
-    const hits = e.shots.filter((s) => s.hitPlayerId);
+    const hits = shots.filter((s) => s.hitPlayerId);
     const mutual = hits.find((a) => hits.some((b) => b.shooterId === a.hitPlayerId && b.hitPlayerId === a.shooterId));
-    const hitCount = new Map<string, number>();
-    for (const s of hits) hitCount.set(s.hitPlayerId!, (hitCount.get(s.hitPlayerId!) ?? 0) + 1);
-    const overkill = [...hitCount.entries()].find(([, n]) => n >= 3);
-
     const killer = hits.find((s) => s.hitPlayerId === this.localId);
     const teams = new Set(alive.map((p) => p.team));
     const teamLine =
       alive.length > 0 && teams.size === 1 && alive[0]!.team !== 0 ? `${TEAM_NAMES[alive[0]!.team as 1 | 2]} STANDING` : survivors;
+    const multi = new Map<string, number>();
+    for (const s of hits) multi.set(s.shooterId, (multi.get(s.shooterId) ?? 0) + 1);
 
-    if (killer) {
-      return { headline: 'YOU WERE ELIMINATED', detail: `BY ${label(killer.shooterId)}` };
-    }
+    if (killer) return { headline: 'YOU WERE ELIMINATED', detail: `BY ${label(killer.shooterId)}` };
     if (hits.length === 0) return { headline: 'EVERYBODY MISSED', detail: teamLine };
-    if (overkill) return { headline: 'OVERKILL', detail: `${overkill[1]} SHOTS ON ${label(overkill[0])}` };
     if (mutual) return { headline: 'MUTUAL ELIMINATION', detail: `${label(mutual.shooterId)} × ${label(mutual.hitPlayerId!)}` };
-    if (hits.length >= 2 && alive.length === 0) return { headline: 'NOBODY SURVIVED', detail: 'DRAW' };
-    const mine = hits.filter((s) => s.shooterId === this.localId);
-    if (mine.length > 0) return { headline: 'DIRECT HIT', detail: teamLine };
-    return { headline: teamLine };
+    if (alive.length === 0) return { headline: 'NOBODY SURVIVED', detail: 'DRAW' };
+    if (hits.some((s) => s.shooterId === this.localId)) return { headline: 'DIRECT HIT', detail: teamLine };
+    return { headline: teamLine, detail: `${hits.length} DOWN` };
   }
 }

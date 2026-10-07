@@ -1,5 +1,6 @@
 import {
   MatchSimulation,
+  sanitizeConfig,
   SIM_TICK_RATE,
   type BotDifficulty,
   type MatchConfig,
@@ -33,7 +34,10 @@ export class LocalSession implements GameSession {
     for (let i = 0; i < opts.bots; i++) {
       seeds.push({ id: `bot${i + 1}`, name: names[i] ?? `Bot ${i + 1}`, isBot: true, botDifficulty: opts.difficulty });
     }
-    this.sim = new MatchSimulation({ ...opts.config, maxPlayers: seeds.length, botDifficulty: opts.difficulty }, seeds);
+    this.sim = new MatchSimulation(
+      { ...sanitizeConfig(opts.config), maxPlayers: seeds.length, botDifficulty: opts.difficulty },
+      seeds,
+    );
   }
 
   setListener(listener: SessionListener): void {

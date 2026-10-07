@@ -2,11 +2,11 @@
 
 > **Remember. Aim. Fire.** A 3D party game that runs straight in the browser: open the link, type a name, and play.
 
-Every subject in the test chamber holds a gun with a laser sight. For a few seconds you can see everyone and where they are aiming. Then the lights cut out and **every opponent disappears**. You keep aiming from memory and guess whether they moved, until the countdown hits zero and **everyone fires at the same moment**. The lights come back, the ragdolls fly, and the last subject standing wins.
+Every subject in the test chamber holds a gun with a laser sight. For a few seconds you can see everyone and where they are aiming. Then the lights cut out and **every opponent disappears**: you can still run and aim, but you're playing from memory. A popup counts down `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1`, then everyone reappears and **freezes** with their aim locked. The shots go off **one by one**, the ragdolls fly, and the last subject standing wins.
 
-| Visible: memorise | Blind: they're gone | Zero: everyone fires |
-|---|---|---|
-| ![Visible phase](docs/screenshots/visible-phase.png) | ![Blind phase](docs/screenshots/blind-phase.png) | ![Shootout](docs/screenshots/shootout.png) |
+| Visible: memorise | Hidden: they're gone | Freeze: aims locked | Shots, one by one |
+|---|---|---|---|
+| ![Visible phase](docs/screenshots/visible-phase.png) | ![Hidden phase](docs/screenshots/blind-phase.png) | ![Freeze](docs/screenshots/factory-freeze.png) | ![Shooting](docs/screenshots/shootout.png) |
 
 | Main menu | Teams: allies stay ghosted |
 |---|---|
@@ -18,18 +18,29 @@ Every subject in the test chamber holds a gun with a laser sight. For a few seco
 
 ## Core loop
 
-`SEE → AIM → MEMORIZE → DISAPPEAR → PREDICT → SHOOT → REVEAL → LAUGH → REPEAT`
+`SEE → AIM → MEMORIZE → DISAPPEAR → PREDICT → FREEZE → SHOOT (ONE BY ONE) → LAUGH → REPEAT`
 
 | Phase | What happens |
 |---|---|
 | **Round intro** | `ROUND 03` → `BLIND SHOT` → `MEMORIZE YOUR TARGET.` |
-| **Spawn** | Subjects drop onto their pads |
-| **Visible (5 s)** | Everyone is visible with laser sights. Aim, read who is aiming at you, and memorise |
-| **Hide** | A warning tone plays, the lights flicker, and the enemies vanish (`VISUAL FEED DISABLED`) |
-| **Blind + countdown (3 s)** | Enemies are truly gone. Your own laser stays. `SHOOTOUT IN 3 · 2 · 1` |
-| **Fire** | Every living subject fires once, automatically, at the same moment |
-| **Resolution / Reveal** | Muzzle flashes, tracers and ragdolls, then `2 SURVIVORS`, `MUTUAL ELIMINATION` or `EVERYBODY MISSED` |
-| **Round results** | Shots repeat until one subject (or team) is left. That side wins the round |
+| **Spawn** | Subjects drop in at random spots anywhere on the floor |
+| **Visible (5 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
+| **Hide** | Warning tone, the lights flicker, and enemies vanish (`TARGETS HIDDEN`) |
+| **Countdown (5 s)** | Enemies are truly gone. You can still move and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
+| **Freeze** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`) |
+| **Shooting** | Subjects fire **one at a time** in a random order. A subject who gets shot before their turn never fires |
+| **Reveal** | `HIT!`, `MISS`, `EVERYBODY MISSED`, `2 SURVIVORS`… |
+| **Round results** | Volleys repeat until one subject (or team) is left. That side wins the round |
+
+Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultaneously and two subjects can kill each other.
+
+## Maps
+
+| Map | Size | Layout |
+|---|---|---|
+| **Test Chamber 01** | 28 × 28 m | Open square floor with 4 pillars and 2 low blocks |
+| **Factory Floor** | 36 × 26 m | Long brick hall with crates and steel columns to hide behind |
+| **Cooling Room** | 30 × 30 m | Tiled reactor room with a central core and big coolant tanks |
 
 A match is **first to 3 round wins** (best of 5). Hosts can change this.
 
@@ -38,18 +49,18 @@ A match is **first to 3 round wins** (best of 5). Hosts can change this.
 | Input | Action |
 |---|---|
 | Mouse | Aim. Your subject turns to face the cursor |
-| WASD / arrows | Move (light movement inside your pad's circle) |
+| WASD / arrows | Move anywhere on the floor (while visible and while hidden; never during the freeze) |
 | Shift | Sprint |
 | Tab | Scoreboard |
 | Esc | Pause / menu |
 
-You never press fire. Every subject fires automatically at zero, so you get **one shot per volley**. In Settings you can switch to a pointer-locked "mouse turn" aim mode.
+You never press fire. Your shot goes off automatically after the freeze, so you get **one shot per volley**, and it goes wherever you were aiming when the freeze hit. In Settings you can switch to a pointer-locked "mouse turn" aim mode.
 
 ## Modes
 
 * **Solo:** you plus 1 to 7 bots (EASY / NORMAL / HARD). It runs entirely in your browser with no server needed.
 * **Quick Play:** joins an open public lobby, or creates one.
-* **Private Room:** creates a room with a 5-character code (e.g. `K7D4Q`) for friends to join. The host configures the mode, max players (2–8), rounds, visible and blind phase length, movement on/off, friendly fire, bot fill and map.
+* **Private Room:** creates a room with a 5-character code (e.g. `K7D4Q`) for friends to join. The host configures the mode, max players (2–8), rounds, visible and hidden phase length, shot order (one by one / all at once), friendly fire, bot fill and map.
 * **Free For All:** last subject alive wins the round. If everyone dies at once, the round is a draw.
 * **Teams (2v2 / 3v3 / 4v4):** blue vs orange. Teammates stay faintly visible (ghosted) while enemies are hidden. Friendly fire is off by default; with it off, bullets pass through teammates.
 
@@ -103,17 +114,23 @@ packages/
 * The local subject is predicted with the shared `stepMovement` and reconciled by replaying unacknowledged inputs. Remote subjects are interpolated with a 100 ms buffer.
 * **Reconnect:** a guest session token (per tab) lets a dropped player reclaim their seat for 30 s. If the host leaves, host transfers to the next player. A player who drops mid-round is removed from that round safely, and if only one side remains, the round finishes.
 
-## How simultaneous shots work
+## How the shots are resolved
 
-When the countdown reaches zero (`BlindShotMode.fire()`):
+When the hidden countdown ends, the server enters **FREEZE**: movement and aim input stop being applied, so every subject's position and aim are locked on the server. Clients only ever sent intent, so nobody can change their aim after the lock.
 
-1. **Snapshot.** Freeze position and yaw of every subject alive at that instant.
-2. **Compute (pure).** For each shooter, raycast from the muzzle against the chamber wall, the pillars and every subject in the snapshot (skipping teammates when friendly fire is off). This step changes nothing.
-3. **Apply together.** Collect every hit, then eliminate all of them at once and award points.
+**One by one (default)** (`BlindShotMode.updateShooting()`):
 
-Because step 2 only reads the frozen snapshot, A and B can kill each other in the same volley, and shooter order never matters (there is a unit test for this). If every remaining side dies at once, the round is a draw.
+1. The living subjects are shuffled into a random firing order, so nobody is always first.
+2. Every 0.85 s the next subject fires: the server raycasts from their muzzle along their locked aim against the walls, obstacles and every subject still alive.
+3. A hit eliminates the target immediately. A subject who is eliminated before their turn never fires.
+4. Once only one side is left, the remaining turns are skipped.
 
-Since the server fires automatically at a time it owns, latency doesn't decide who shoots first. The server uses the most recent validated aim for every player.
+**All at once (host option)** (`BlindShotMode.fireSimultaneous()`):
+
+1. Compute every shot from one frozen snapshot (pure, changes nothing).
+2. Apply all eliminations together. A and B can kill each other, and shooter order never matters (there is a unit test for this). If everyone dies at once, the round is a draw.
+
+The server owns the timing, so latency never decides who shoots first. Each shot is broadcast as a `shotFired` event, and clients play the flash, tracer, sound and ragdoll for it.
 
 Scoring: hit +100, elimination +100, survived volley +50, round win +200.
 

@@ -1,6 +1,7 @@
 /* Minimal dependency-free test runner for the shared simulation. Run: npm test */
 
-import { TEST_CHAMBER_01 } from '../arena/arena';
+import { ARENAS, TEST_CHAMBER_01, randomSpawns, resolveCollisions } from '../arena/arena';
+import { Rng } from '../util/rng';
 import { DEFAULT_MATCH_CONFIG } from '../gameState/config';
 import { dirToYaw, sub } from '../math/vec';
 import { collectEliminations, computeShots } from '../sim/shotResolution';
@@ -44,7 +45,7 @@ test('result does not depend on shooter order', () => {
 });
 
 test('pillars stop bullets', () => {
-  const pillar = TEST_CHAMBER_01.pillars[0];
+  const pillar = TEST_CHAMBER_01.obstacles.find((o) => o.kind === 'circle');
   if (!pillar) throw new Error('arena has pillars');
   const from = { x: 0, z: 0 };
   const behind = { x: pillar.pos.x * 2, z: pillar.pos.z * 2 };
@@ -87,13 +88,13 @@ test('hidden enemies are absent from a viewer snapshot', () => {
   let sawHidden = false;
   for (let i = 0; i < 30 * 15 && !sawHidden; i++) {
     sim.tick(1 / 30);
-    if (sim.phase === 'BLIND') {
+    if (sim.phase === 'COUNTDOWN') {
       sawHidden = true;
       const view = sim.buildView('h');
-      assert(view.bodies.length === 1 && view.bodies[0]?.id === 'h', 'only self should be visible while blind');
+      assert(view.bodies.length === 1 && view.bodies[0]?.id === 'h', 'only self should be visible while hidden');
     }
   }
-  assert(sawHidden, 'reached BLIND phase');
+  assert(sawHidden, 'reached COUNTDOWN phase');
 });
 
 test('a full bot match always terminates with a winner or a draw', () => {
@@ -123,6 +124,38 @@ test('team match terminates', () => {
   sim.start();
   for (let i = 0; i < 30 * 60 * 20 && !sim.finished; i++) sim.tick(1 / 30);
   assert(sim.finished, 'team match did not finish');
+});
+
+test('sequential volley: a subject shot earlier never fires', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const sim = new MatchSimulation(
+      { ...DEFAULT_MATCH_CONFIG, fireOrder: 'SEQUENTIAL' },
+      [1, 2, 3, 4].map((i) => ({ id: `b${i}`, name: `B${i}`, isBot: true })),
+      seed,
+    );
+    sim.start();
+    const dead = new Set<string>();
+    for (let i = 0; i < 30 * 60 * 10 && !sim.finished; i++) {
+      sim.tick(1 / 30);
+      for (const e of sim.drainEvents()) {
+        if (e.type === 'roundEnded') dead.clear();
+        if (e.type !== 'shotFired') continue;
+        assert(!dead.has(e.data.result.shooterId), `seed ${seed}: dead subject fired`);
+        for (const id of e.data.eliminated) dead.add(id);
+      }
+    }
+  }
+});
+
+test('spawns stay inside the arena and clear of obstacles', () => {
+  for (const arena of Object.values(ARENAS)) {
+    const spawns = randomSpawns(arena, [0, 0, 0, 0, 0, 0, 0, 0], new Rng(3));
+    for (const s of spawns) {
+      assert(Math.abs(s.pos.x) < arena.halfX && Math.abs(s.pos.z) < arena.halfZ, `${arena.id}: spawn outside`);
+      const r = resolveCollisions(arena, s.pos, 0.5);
+      assert(Math.hypot(r.x - s.pos.x, r.z - s.pos.z) < 1e-6, `${arena.id}: spawn inside an obstacle`);
+    }
+  }
 });
 
 test('names and room codes are sanitised', () => {

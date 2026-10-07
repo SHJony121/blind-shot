@@ -6,25 +6,26 @@ export type Phase =
   | 'SPAWN'
   | 'VISIBLE'
   | 'HIDE'
-  | 'BLIND'
   | 'COUNTDOWN'
-  | 'FIRE'
-  | 'RESOLUTION'
+  | 'FREEZE'
+  | 'SHOOTING'
   | 'REVEAL'
   | 'ROUND_RESULTS'
   | 'MATCH_END';
 
 /** Phases during which enemies are hidden from every viewer. */
-export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'BLIND', 'COUNTDOWN']);
-/** Phases during which subjects can rotate / aim. */
-export const AIM_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'BLIND', 'COUNTDOWN']);
-/** Phases during which subjects can move (if the match allows movement). */
+export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'COUNTDOWN']);
+/** Phases during which subjects can rotate / aim. FREEZE and SHOOTING lock every aim. */
+export const AIM_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'COUNTDOWN']);
+/** Phases during which subjects can move. */
 export const MOVE_PHASES: ReadonlySet<Phase> = AIM_PHASES;
 
 export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export type GameModeId = 'FFA' | 'TEAMS';
-export type MovementMode = 'LIGHT' | 'FIXED';
-export type MapId = 'TEST_CHAMBER_01';
+/** SEQUENTIAL: subjects fire one by one in a random order (a subject shot first never fires).
+ *  SIMULTANEOUS: everyone fires at once and mutual eliminations are possible. */
+export type FireOrder = 'SEQUENTIAL' | 'SIMULTANEOUS';
+export type MapId = 'TEST_CHAMBER_01' | 'FACTORY_FLOOR' | 'COOLING_ROOM';
 export type TeamId = 0 | 1 | 2;
 
 export interface MatchConfig {
@@ -33,7 +34,7 @@ export interface MatchConfig {
   roundsToWin: number;
   visibleSeconds: number;
   blindSeconds: number;
-  movement: MovementMode;
+  fireOrder: FireOrder;
   friendlyFire: boolean;
   mapId: MapId;
   /** Difficulty used for bots added to this match. */
@@ -66,8 +67,6 @@ export interface PlayerInfo {
   subject: number;
   colorIndex: number;
   team: TeamId;
-  /** Spawn pad (spawn positions are public: everybody sees them at round start). */
-  padIndex: number;
   isBot: boolean;
   botDifficulty: BotDifficulty | null;
   connected: boolean;
@@ -119,15 +118,21 @@ export interface ShotResult {
   hitZone: HitZone | null;
   /** What stopped the bullet. */
   hitSurface: 'WALL' | 'PILLAR' | 'SUBJECT' | 'NONE';
+  /** Surface normal where the bullet stopped (for impact effects). */
+  normal: Vec2;
 }
 
-export interface ShootoutEvent {
+/** One shot of a volley. In SEQUENTIAL order these arrive one by one; in SIMULTANEOUS all in one tick. */
+export interface ShotFiredEvent {
   round: number;
   shot: number;
-  /** Ground-truth positions of every subject that was alive at fire time (the reveal). */
-  revealed: BodyState[];
-  shots: ShotResult[];
+  /** 0-based position of this shot in the volley, and the volley size. */
+  index: number;
+  total: number;
+  result: ShotResult;
+  /** Subjects eliminated by this shot (applied immediately in SEQUENTIAL order). */
   eliminated: string[];
+  simultaneous: boolean;
 }
 
 export interface RoundEndedEvent {
@@ -158,7 +163,7 @@ export interface PhaseChangedEvent {
 
 export type MatchEvent =
   | { type: 'phaseChanged'; data: PhaseChangedEvent }
-  | { type: 'shootout'; data: ShootoutEvent }
+  | { type: 'shotFired'; data: ShotFiredEvent }
   | { type: 'roundEnded'; data: RoundEndedEvent }
   | { type: 'matchEnded'; data: MatchEndedEvent };
 

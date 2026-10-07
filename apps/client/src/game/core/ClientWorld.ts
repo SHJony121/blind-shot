@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { TEST_CHAMBER_01, type ArenaDef } from '@blindshot/shared';
+import { getArena, TEST_CHAMBER_01, type ArenaDef, type MapId } from '@blindshot/shared';
 import { audio } from '../audio/AudioEngine';
 import { CameraRig } from '../camera/CameraRig';
 import { Effects } from '../effects/Effects';
-import { TestChamber } from '../maps/TestChamber';
-import { loadRapier, PhysicsWorld } from '../physics/PhysicsWorld';
+import { ArenaView } from '../maps/ArenaView';
+import { loadRapier, PhysicsWorld, type Rapier } from '../physics/PhysicsWorld';
 import { settingsStore } from '../../state/settings';
 import { Engine } from './Engine';
 import { Input } from './Input';
@@ -18,16 +18,15 @@ const shakeTmp = new THREE.Vector3();
 export class ClientWorld {
   readonly engine: Engine;
   readonly input: Input;
-  readonly arena: ArenaDef = TEST_CHAMBER_01;
-  readonly chamber: TestChamber;
+  arena: ArenaDef = TEST_CHAMBER_01;
+  chamber: ArenaView;
   readonly effects = new Effects();
   readonly cameraRig: CameraRig;
   physics: PhysicsWorld | null = null;
 
   /** Per-frame hooks for whoever currently drives the camera (menu or match). */
-  cameraTarget: () => { subject: { x: number; z: number } | null; pad: { x: number; z: number } | null; aim: { x: number; z: number } | null } = () => ({
+  cameraTarget: () => { subject: { x: number; z: number } | null; aim: { x: number; z: number } | null } = () => ({
     subject: null,
-    pad: null,
     aim: null,
   });
 
@@ -37,7 +36,7 @@ export class ClientWorld {
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas);
     this.input = new Input(canvas);
-    this.chamber = new TestChamber(this.arena, this.engine.renderer);
+    this.chamber = new ArenaView(this.arena, this.engine.renderer);
     this.cameraRig = new CameraRig(this.engine.camera);
     this.engine.scene.add(this.chamber.group, this.effects.group);
 
@@ -47,7 +46,7 @@ export class ClientWorld {
       this.effects.reducedFlash = s.reducedFlash;
       this.cameraRig.sway = s.cameraSway;
       this.engine.setShadows(s.shadows);
-      audio.setVolumes({ master: s.masterVolume, sfx: s.sfxVolume, music: s.musicVolume });
+      audio.setVolumes({ master: s.masterVolume, sfx: s.soundOn ? s.sfxVolume : 0, music: s.musicOn ? s.musicVolume : 0 });
     };
     applySettings();
     settingsStore.subscribe(applySettings);
@@ -55,9 +54,23 @@ export class ClientWorld {
     this.engine.onFrame((dt) => this.update(dt));
   }
 
+  private rapier: Rapier | null = null;
+
   async initPhysics(): Promise<void> {
-    const R = await loadRapier();
-    this.physics = new PhysicsWorld(R, this.arena);
+    this.rapier = await loadRapier();
+    this.physics = new PhysicsWorld(this.rapier, this.arena);
+  }
+
+  /** Swap the arena (visuals + ragdoll physics). Keeps lighting mood. */
+  setArena(id: MapId): void {
+    if (this.arena.id === id) return;
+    this.arena = getArena(id);
+    this.chamber.dispose();
+    this.chamber = new ArenaView(this.arena, this.engine.renderer);
+    this.engine.scene.add(this.chamber.group);
+    this.physics?.dispose();
+    this.physics = this.rapier ? new PhysicsWorld(this.rapier, this.arena) : null;
+    this.effects.clearDecals();
   }
 
   start(): void {
@@ -85,6 +98,7 @@ export class ClientWorld {
     for (const hook of this.hooks) hook(dt);
 
     const t = this.cameraTarget();
-    this.cameraRig.update(dt, t.subject, t.pad, t.aim, this.effects.shakeOffset(shakeTmp));
+    this.cameraRig.bounds = { x: this.arena.halfX, z: this.arena.halfZ };
+    this.cameraRig.update(dt, t.subject, t.aim, this.effects.shakeOffset(shakeTmp));
   }
 }

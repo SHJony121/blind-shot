@@ -30,8 +30,8 @@ export function Hud({ actions }: { actions: HudActions }) {
   const teams = h.config?.mode === 'TEAMS';
   const roster = [...h.roster].sort((a, b) => a.subject - b.subject);
   const need = h.config?.roundsToWin ?? 3;
-  const hiddenPhase = h.phase === 'HIDE' || h.phase === 'BLIND' || h.phase === 'COUNTDOWN';
-  const barPhases = h.phase === 'VISIBLE' || h.phase === 'COUNTDOWN' || h.phase === 'BLIND';
+  const hiddenPhase = h.phase === 'HIDE' || h.phase === 'COUNTDOWN';
+  const barPhases = h.phase === 'VISIBLE' || h.phase === 'COUNTDOWN';
 
   return (
     <div className="overlay">
@@ -85,6 +85,18 @@ export function Hud({ actions }: { actions: HudActions }) {
         </div>
       ) : null}
 
+      {h.popup && h.phase === 'COUNTDOWN' && !h.paused ? (
+        <div className="popup-wrap">
+          <div className="popup">
+            <div className="popup-title">{h.popup.title}</div>
+            <div key={h.popup.value} className="popup-value">
+              {h.popup.value}
+            </div>
+            <div className="popup-sub">THEN EVERYONE FREEZES</div>
+          </div>
+        </div>
+      ) : null}
+
       {h.roundResult && !h.matchResult ? <RoundResult /> : null}
 
       {h.spectating && !h.roundResult && !h.matchResult ? <div className="spectating">ELIMINATED · SPECTATING</div> : null}
@@ -94,12 +106,13 @@ export function Hud({ actions }: { actions: HudActions }) {
           <div className="hint">
             <kbd>MOUSE</kbd> AIM
           </div>
-          {h.config?.movement === 'LIGHT' ? (
-            <div className="hint">
-              <kbd>WASD</kbd> MOVE
-            </div>
-          ) : null}
-          <div className="hint">EVERYONE FIRES AUTOMATICALLY AT ZERO</div>
+          <div className="hint">
+            <kbd>WASD</kbd> MOVE
+          </div>
+          <div className="hint">
+            <kbd>SHIFT</kbd> SPRINT
+          </div>
+          <div className="hint">SHOTS FIRE AUTOMATICALLY AFTER THE FREEZE</div>
         </div>
       ) : null}
 

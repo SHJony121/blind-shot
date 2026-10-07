@@ -28,96 +28,9 @@ export function hazardStripeTexture(repeat: number): THREE.Texture {
   return tex;
 }
 
-/** Top of the circular platform: steel plates, seams, a hazard ring and the chamber emblem. */
-export function platformTexture(): THREE.Texture {
-  return canvasTexture('platform', 1024, 1024, (g) => {
-    const c = 512;
-    const R = 512;
-    g.fillStyle = '#3b4249';
-    g.fillRect(0, 0, 1024, 1024);
-
-    // Diamond plate texture.
-    g.fillStyle = 'rgba(255,255,255,0.045)';
-    for (let y = 0; y < 1024; y += 18) {
-      for (let x = (y / 18) % 2 === 0 ? 0 : 9; x < 1024; x += 18) {
-        g.save();
-        g.translate(x, y);
-        g.rotate(Math.PI / 4);
-        g.fillRect(-4, -1.5, 8, 3);
-        g.restore();
-      }
-    }
-    // Concentric seams and radial plate joints.
-    g.strokeStyle = 'rgba(10,12,14,0.55)';
-    g.lineWidth = 4;
-    for (const r of [0.22, 0.48, 0.72]) {
-      g.beginPath();
-      g.arc(c, c, R * r, 0, Math.PI * 2);
-      g.stroke();
-    }
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo(c + Math.cos(a) * R * 0.22, c + Math.sin(a) * R * 0.22);
-      g.lineTo(c + Math.cos(a) * R * 0.9, c + Math.sin(a) * R * 0.9);
-      g.stroke();
-    }
-    // Rivets along the seams.
-    g.fillStyle = 'rgba(200,210,220,0.18)';
-    for (const r of [0.48, 0.72]) {
-      for (let i = 0; i < 48; i++) {
-        const a = (i / 48) * Math.PI * 2;
-        g.beginPath();
-        g.arc(c + Math.cos(a) * R * r, c + Math.sin(a) * R * r, 3, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
-    // Hazard ring at the edge.
-    const inner = R * 0.91;
-    const outer = R * 0.995;
-    const n = 64;
-    for (let i = 0; i < n; i++) {
-      const a0 = (i / n) * Math.PI * 2;
-      const a1 = ((i + 1) / n) * Math.PI * 2;
-      const skew = (Math.PI * 2) / n / 2;
-      g.fillStyle = i % 2 === 0 ? YELLOW : INK;
-      g.beginPath();
-      g.moveTo(c + Math.cos(a0) * inner, c + Math.sin(a0) * inner);
-      g.lineTo(c + Math.cos(a0 + skew) * outer, c + Math.sin(a0 + skew) * outer);
-      g.lineTo(c + Math.cos(a1 + skew) * outer, c + Math.sin(a1 + skew) * outer);
-      g.lineTo(c + Math.cos(a1) * inner, c + Math.sin(a1) * inner);
-      g.closePath();
-      g.fill();
-    }
-    // Centre emblem: target ring + chamber number.
-    g.strokeStyle = 'rgba(227,178,60,0.75)';
-    g.lineWidth = 10;
-    g.beginPath();
-    g.arc(c, c, R * 0.17, 0, Math.PI * 2);
-    g.stroke();
-    g.lineWidth = 6;
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      g.beginPath();
-      g.moveTo(c + dx * R * 0.12, c + dy * R * 0.12);
-      g.lineTo(c + dx * R * 0.22, c + dy * R * 0.22);
-      g.stroke();
-    }
-    g.fillStyle = 'rgba(236,230,214,0.85)';
-    g.font = '120px Anton, Impact, sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText('01', c, c + 6);
-  });
-}
-
 /** Inside of the chamber wall: dark panels, a stripe band and huge painted numbers. */
-export function wallTexture(): THREE.Texture {
-  const tex = canvasTexture('wall', 2048, 512, (g) => {
+export function chamberWallTexture(label: string, repeat: number): THREE.Texture {
+  const tex = canvasTexture(`wall-chamber-${label}`, 2048, 512, (g) => {
     g.fillStyle = '#1f262c';
     g.fillRect(0, 0, 2048, 512);
     // Panels.
@@ -138,14 +51,13 @@ export function wallTexture(): THREE.Texture {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillStyle = 'rgba(227,178,60,0.22)';
-    for (let i = 0; i < 4; i++) g.fillText('01', 256 + i * 512, 300);
+    for (let i = 0; i < 4; i++) g.fillText(label, 256 + i * 512, 300);
     g.font = '700 44px "Barlow Condensed", sans-serif';
     g.fillStyle = 'rgba(236,230,214,0.25)';
     for (let i = 0; i < 4; i++) g.fillText('TEST CHAMBER', 256 + i * 512, 150);
   }).clone();
   tex.wrapS = THREE.RepeatWrapping;
-  // Negative repeat un-mirrors the texture on the inside (BackSide) of the wall.
-  tex.repeat.set(-2, 1);
+  tex.repeat.set(repeat, 1);
   tex.needsUpdate = true;
   return tex;
 }
@@ -176,24 +88,183 @@ export function windowTexture(variant: number): THREE.Texture {
   });
 }
 
-export function pitTexture(): THREE.Texture {
-  const tex = canvasTexture('pit', 256, 256, (g) => {
-    g.fillStyle = '#0b0e10';
-    g.fillRect(0, 0, 256, 256);
-    g.strokeStyle = 'rgba(227,178,60,0.12)';
-    g.lineWidth = 2;
-    for (let i = 0; i <= 256; i += 32) {
+
+function tiled(tex: THREE.Texture, rx: number, ry: number): THREE.Texture {
+  const t = tex.clone();
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.needsUpdate = true;
+  return t;
+}
+
+/** One 4 m floor tile per texture repeat. */
+export function floorTexture(theme: 'chamber' | 'factory' | 'cooling', rx: number, ry: number): THREE.Texture {
+  const base = canvasTexture(`floor-${theme}`, 512, 512, (g) => {
+    if (theme === 'chamber') {
+      g.fillStyle = '#3a4148';
+      g.fillRect(0, 0, 512, 512);
+      g.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let y = 0; y < 512; y += 16) {
+        for (let x = (y / 16) % 2 === 0 ? 0 : 8; x < 512; x += 16) {
+          g.save();
+          g.translate(x, y);
+          g.rotate(Math.PI / 4);
+          g.fillRect(-4, -1.5, 8, 3);
+          g.restore();
+        }
+      }
+      g.strokeStyle = 'rgba(8,10,12,0.6)';
+      g.lineWidth = 6;
+      g.strokeRect(3, 3, 506, 506);
+      g.fillStyle = 'rgba(200,210,220,0.2)';
+      for (const [x, y] of [[18, 18], [494, 18], [18, 494], [494, 494]] as const) {
+        g.beginPath();
+        g.arc(x, y, 6, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else if (theme === 'factory') {
+      g.fillStyle = '#6b6559';
+      g.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 2500; i++) {
+        const v = 80 + Math.random() * 50;
+        g.fillStyle = `rgba(${v},${v - 6},${v - 16},0.35)`;
+        g.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
+      }
+      g.strokeStyle = 'rgba(30,28,24,0.55)';
+      g.lineWidth = 4;
+      g.strokeRect(2, 2, 508, 508);
+      g.fillStyle = 'rgba(40,30,20,0.1)';
       g.beginPath();
-      g.moveTo(i, 0);
-      g.lineTo(i, 256);
-      g.moveTo(0, i);
-      g.lineTo(256, i);
+      g.ellipse(170, 330, 90, 50, 0.4, 0, Math.PI * 2);
+      g.fill();
+    } else {
+      g.fillStyle = '#c9d6dc';
+      g.fillRect(0, 0, 512, 512);
+      g.strokeStyle = '#8fa3ad';
+      g.lineWidth = 4;
+      for (let i = 0; i <= 512; i += 128) {
+        g.beginPath();
+        g.moveTo(i, 0);
+        g.lineTo(i, 512);
+        g.moveTo(0, i);
+        g.lineTo(512, i);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(70,140,180,0.18)';
+      g.fillRect(128, 128, 128, 128);
+      g.fillRect(256, 256, 128, 128);
+    }
+  });
+  return tiled(base, rx, ry);
+}
+
+export function factoryWallTexture(label: string, repeat: number): THREE.Texture {
+  const tex = canvasTexture(`wall-factory-${label}`, 1024, 512, (g) => {
+    g.fillStyle = '#5a3a2e';
+    g.fillRect(0, 0, 1024, 512);
+    for (let y = 0; y < 400; y += 32) {
+      for (let x = (y / 32) % 2 === 0 ? 0 : 32; x < 1024; x += 64) {
+        const v = 70 + Math.random() * 25;
+        g.fillStyle = `rgb(${v + 20},${v - 15},${v - 30})`;
+        g.fillRect(x + 2, y + 2, 60, 28);
+      }
+    }
+    g.fillStyle = '#2b2f33';
+    g.fillRect(0, 400, 1024, 112);
+    g.save();
+    g.translate(0, 400);
+    stripes(g, 1024, 30, 22);
+    g.restore();
+    g.font = '200px Anton, Impact, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(236,230,214,0.28)';
+    g.fillText(label, 512, 230);
+  });
+  return tiled(tex, repeat, 1);
+}
+
+export function coolingWallTexture(label: string, repeat: number): THREE.Texture {
+  const tex = canvasTexture(`wall-cooling-${label}`, 1024, 512, (g) => {
+    g.fillStyle = '#7f98a6';
+    g.fillRect(0, 0, 1024, 512);
+    for (let x = 0; x < 1024; x += 128) {
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.fillRect(x + 6, 10, 116, 380);
+      g.fillStyle = 'rgba(20,40,55,0.35)';
+      g.fillRect(x + 6, 388, 116, 6);
+    }
+    g.fillStyle = '#2f6f8f';
+    g.fillRect(0, 420, 1024, 92);
+    g.font = '180px Anton, Impact, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(20,50,70,0.35)';
+    g.fillText(label, 512, 210);
+    g.font = '700 40px "Barlow Condensed", sans-serif';
+    g.fillStyle = 'rgba(236,240,244,0.85)';
+    g.fillText('COOLANT LOOP · KEEP CLEAR', 512, 466);
+  });
+  return tiled(tex, repeat, 1);
+}
+
+export function crateTexture(): THREE.Texture {
+  return canvasTexture('crate', 256, 256, (g) => {
+    g.fillStyle = '#b07a3e';
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle = 'rgba(80,45,15,0.35)';
+    for (let y = 0; y < 256; y += 32) g.fillRect(0, y, 256, 3);
+    g.strokeStyle = '#6e4519';
+    g.lineWidth = 18;
+    g.strokeRect(9, 9, 238, 238);
+    g.beginPath();
+    g.moveTo(18, 18);
+    g.lineTo(238, 238);
+    g.moveTo(238, 18);
+    g.lineTo(18, 238);
+    g.stroke();
+  });
+}
+
+export function tankTexture(): THREE.Texture {
+  const tex = canvasTexture('tank', 512, 256, (g) => {
+    g.fillStyle = '#dfe6ea';
+    g.fillRect(0, 0, 512, 256);
+    g.fillStyle = '#2f6f8f';
+    g.fillRect(0, 150, 512, 36);
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let x = 0; x < 512; x += 64) g.fillRect(x, 0, 4, 256);
+    g.font = '60px Anton, Impact, sans-serif';
+    g.fillStyle = '#2f6f8f';
+    g.textAlign = 'center';
+    g.fillText('LN2', 128, 110);
+    g.fillText('LN2', 384, 110);
+  });
+  return tiled(tex, 1, 1);
+}
+
+/** Large painted floor emblem (transparent), e.g. the chamber number at the centre. */
+export function emblemTexture(label: string, color: string): THREE.Texture {
+  return canvasTexture(`emblem-${label}-${color}`, 512, 512, (g) => {
+    g.strokeStyle = color;
+    g.globalAlpha = 0.75;
+    g.lineWidth = 16;
+    g.beginPath();
+    g.arc(256, 256, 200, 0, Math.PI * 2);
+    g.stroke();
+    g.lineWidth = 10;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      g.beginPath();
+      g.moveTo(256 + dx * 150, 256 + dy * 150);
+      g.lineTo(256 + dx * 250, 256 + dy * 250);
       g.stroke();
     }
-  }).clone();
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(10, 10);
-  tex.needsUpdate = true;
-  return tex;
+    g.globalAlpha = 0.85;
+    g.fillStyle = 'rgba(236,230,214,0.9)';
+    g.font = '200px Anton, Impact, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(label, 256, 266);
+  });
 }

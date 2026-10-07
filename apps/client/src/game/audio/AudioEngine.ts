@@ -38,53 +38,108 @@ export class AudioEngine {
 
   // --- Sounds ----------------------------------------------------------------
 
-  /** The big one. `pan` -1..1, `distance` in metres, `delay` seconds. */
+  /**
+   * The big one: an oversized test-pistol "BANG". Layers: clipped noise transient, a
+   * resonant low-pass sweep for the boom, a deep sub drop, a hammer clack, and two room
+   * slap-back reflections into a long reverb tail. `pan` -1..1, `distance` metres.
+   */
   gunshot(pan = 0, distance = 6, delay = 0, loudness = 1): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime + delay;
-    const att = Math.max(0.35, 1 - distance / 40) * loudness;
+    const att = Math.max(0.45, 1 - distance / 60) * loudness;
 
     const out = ctx.createGain();
     out.gain.value = att;
+    const drive = ctx.createWaveShaper();
+    drive.curve = softClipCurve();
+    drive.oversample = '2x';
     const panner = ctx.createStereoPanner();
     panner.pan.value = Math.max(-1, Math.min(1, pan));
-    const clip = ctx.createWaveShaper();
-    clip.curve = softClipCurve();
-    out.connect(clip).connect(panner);
+    out.connect(drive).connect(panner);
     panner.connect(this.sfx);
     panner.connect(this.reverbSend);
 
-    // 1. Crack: bright noise transient.
-    this.noiseBurst(out, t, 0.09, { type: 'highpass', freq: 1800 }, 1.4, 0.0015);
-    // 2. Body: mid noise.
-    this.noiseBurst(out, t, 0.32, { type: 'bandpass', freq: 650, q: 0.7 }, 1.1, 0.002);
-    // 3. Thump: sine pitch drop.
+    // Room slap-back: two short reflections, darker each time.
+    for (const [d, g, f] of [
+      [0.055, 0.35, 2400],
+      [0.13, 0.22, 1200],
+    ] as const) {
+      const delayNode = ctx.createDelay(0.3);
+      delayNode.delayTime.value = d;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = f;
+      const gain = ctx.createGain();
+      gain.gain.value = g;
+      panner.connect(delayNode).connect(lp).connect(gain).connect(this.sfx);
+    }
+
+    // 1. Transient: a hard, bright crack.
+    this.noiseBurst(out, t, 0.05, { type: 'highpass', freq: 1200 }, 2.4, 0.0008);
+    // 2. Boom: noise through a resonant low-pass sweeping down (the "chunk" of the blast).
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 6;
+    lp.frequency.setValueAtTime(5200, t);
+    lp.frequency.exponentialRampToValueAtTime(260, t + 0.16);
+    lp.frequency.exponentialRampToValueAtTime(120, t + 0.5);
+    const boomGain = ctx.createGain();
+    boomGain.gain.setValueAtTime(0, t);
+    boomGain.gain.linearRampToValueAtTime(2.2, t + 0.002);
+    boomGain.gain.exponentialRampToValueAtTime(0.4, t + 0.12);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    src.connect(lp).connect(boomGain).connect(out);
+    src.start(t, Math.random());
+    src.stop(t + 0.75);
+    // 3. Sub drop: the chest thump.
     const sub = ctx.createOscillator();
     sub.type = 'sine';
-    sub.frequency.setValueAtTime(160, t);
-    sub.frequency.exponentialRampToValueAtTime(38, t + 0.28);
+    sub.frequency.setValueAtTime(110, t);
+    sub.frequency.exponentialRampToValueAtTime(32, t + 0.45);
     const subGain = ctx.createGain();
     subGain.gain.setValueAtTime(0, t);
-    subGain.gain.linearRampToValueAtTime(1.6, t + 0.004);
-    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+    subGain.gain.linearRampToValueAtTime(2.4, t + 0.004);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
     sub.connect(subGain).connect(out);
     sub.start(t);
-    sub.stop(t + 0.45);
-    // 4. Mechanical clack (hammer / drum).
+    sub.stop(t + 0.62);
+    // 4. Mechanical: hammer clack right after the shot.
     const clack = ctx.createOscillator();
     clack.type = 'square';
-    clack.frequency.setValueAtTime(2300, t + 0.03);
-    clack.frequency.exponentialRampToValueAtTime(900, t + 0.06);
+    clack.frequency.setValueAtTime(1900, t + 0.09);
+    clack.frequency.exponentialRampToValueAtTime(700, t + 0.12);
     const clackGain = ctx.createGain();
     clackGain.gain.setValueAtTime(0, t);
-    clackGain.gain.setValueAtTime(0.18, t + 0.03);
-    clackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    clackGain.gain.setValueAtTime(0.12, t + 0.09);
+    clackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
     clack.connect(clackGain).connect(out);
     clack.start(t);
-    clack.stop(t + 0.1);
-    // 5. Tail: low rumble.
-    this.noiseBurst(out, t + 0.02, 0.9, { type: 'lowpass', freq: 220 }, 0.9, 0.02);
+    clack.stop(t + 0.16);
+    // 5. Tail: rumbling decay that rolls around the room.
+    this.noiseBurst(out, t + 0.03, 1.4, { type: 'lowpass', freq: 180 }, 1.1, 0.03);
+  }
+
+  /** Everyone reappears: rising sweep + bright sting. */
+  reveal(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.noiseBurst(this.sfx, t, 0.4, { type: 'bandpass', freq: 2400, q: 0.9 }, 0.35, 0.25);
+    this.tone(988, t + 0.02, 0.5, 'triangle', 0.12);
+    this.tone(1480, t + 0.02, 0.35, 'sine', 0.06);
+  }
+
+  /** FREEZE: a heavy mechanical lock-in. */
+  freeze(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.noiseBurst(this.sfx, t, 0.08, { type: 'highpass', freq: 2500 }, 0.6, 0.001);
+    this.noiseBurst(this.sfx, t + 0.01, 0.35, { type: 'lowpass', freq: 260 }, 1.0, 0.003);
+    this.tone(196, t, 0.45, 'square', 0.07);
   }
 
   countdownBeep(n: number): void {
@@ -332,7 +387,7 @@ export class AudioEngine {
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
 
     this.reverb = ctx.createConvolver();
-    this.reverb.buffer = this.impulse(1.3, 2.6);
+    this.reverb.buffer = this.impulse(2.0, 2.4);
     this.reverbSend = ctx.createGain();
     this.reverbSend.gain.value = 0.35;
     this.reverbSend.connect(this.reverb).connect(this.sfx);
@@ -397,7 +452,7 @@ function softClipCurve(): Float32Array<ArrayBuffer> {
   clipCurve = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = (i / (n - 1)) * 2 - 1;
-    clipCurve[i] = Math.tanh(x * 2.2);
+    clipCurve[i] = Math.tanh(x * 3.2);
   }
   return clipCurve;
 }

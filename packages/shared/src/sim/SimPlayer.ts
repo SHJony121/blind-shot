@@ -15,7 +15,6 @@ export interface SimPlayer {
   /** Took part in the current round (false for players who joined late / dropped). */
   inRound: boolean;
   alive: boolean;
-  padIndex: number;
   pos: Vec2;
   yaw: number;
   moving: boolean;
@@ -30,7 +29,6 @@ export const toPlayerInfo = (p: SimPlayer): PlayerInfo => ({
   subject: p.subject,
   colorIndex: p.colorIndex,
   team: p.team,
-  padIndex: p.padIndex,
   isBot: p.isBot,
   botDifficulty: p.botDifficulty,
   connected: p.connected,
