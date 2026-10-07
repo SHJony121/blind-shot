@@ -24,10 +24,10 @@ Every subject in the test chamber holds a gun with a laser sight. For a few seco
 |---|---|
 | **Round intro** | `ROUND 03` → `BLIND SHOT` → `MEMORIZE YOUR TARGET.` |
 | **Spawn** | Subjects drop in at random spots anywhere on the floor |
-| **Visible (5 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
+| **Visible (5 s, up to 15 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
 | **Hide** | Warning tone, the lights flicker, and enemies vanish (`TARGETS HIDDEN`) |
-| **Countdown (5 s)** | Enemies are truly gone. You can still move and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
-| **Freeze** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`) |
+| **Countdown (5 s, up to 15 s)** | Enemies are truly gone. You can still move and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
+| **Freeze (3 s)** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`). Scroll and drag to inspect the lasers |
 | **Shooting** | Subjects fire **one at a time** in a random order. A subject who gets shot before their turn never fires |
 | **Reveal** | `HIT!`, `MISS`, `EVERYBODY MISSED`, `2 SURVIVORS`… |
 | **Round results** | Volleys repeat until one subject (or team) is left. That side wins the round |
@@ -38,11 +38,18 @@ Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultane
 
 | Map | Size | Layout |
 |---|---|---|
+| **White Room** (default) | 32 × 32 m | Bright white checker floor under an open sky, low white walls, a few blocks and posts |
 | **Test Chamber 01** | 28 × 28 m | Open square floor with 4 pillars and 2 low blocks |
 | **Factory Floor** | 36 × 26 m | Long brick hall with crates and steel columns to hide behind |
 | **Cooling Room** | 30 × 30 m | Tiled reactor room with a central core and big coolant tanks |
 
 A match is **first to 3 round wins** (best of 5). Hosts can change this.
+
+**The arena shrinks every round.** Each new round of a match pulls the walls in by 12% (down to half size), so later rounds get tighter and more tense. Obstacles that no longer fit are removed. The size resets for the next match.
+
+## Characters
+
+Pick your look on the main menu (◀ ▶ under your name). It is saved in your browser and other players see it online. There are six original designs: **Test Dummy**, **Unit Bot**, **Astro**, **Hard Hat**, **Beanie** and **Kitty**. Bots pick a random look.
 
 ## Controls (desktop)
 
@@ -52,6 +59,7 @@ A match is **first to 3 round wins** (best of 5). Hosts can change this.
 | WASD / arrows | Move anywhere on the floor (while visible and while hidden; never during the freeze) |
 | Shift | Sprint |
 | Tab | Scoreboard |
+| Mouse wheel / drag (after the freeze) | Zoom in toward the cursor and orbit the camera, to check whether a laser really lines up |
 | Esc | Pause / menu |
 
 You never press fire. Your shot goes off automatically after the freeze, so you get **one shot per volley**, and it goes wherever you were aiming when the freeze hit. In Settings you can switch to a pointer-locked "mouse turn" aim mode.
@@ -210,6 +218,6 @@ Every model, texture, sound and visual effect is **original and generated in cod
 
 * **3D models:** procedural (`SubjectModel`, `GunModel`, `TestChamber`) built from Three.js primitives.
 * **Textures:** drawn at runtime with Canvas 2D (`characters/textures.ts`, `maps/arenaTextures.ts`).
-* **Audio:** synthesised at runtime with the Web Audio API (`audio/AudioEngine.ts`).
+* **Audio:** synthesised at runtime with the Web Audio API (`audio/AudioEngine.ts`). If recorded gunshot files exist at `apps/client/public/sfx/gunshot-1.ogg` (and `-2`, `-3`), they are used instead of the synthesized shot.
 * **Fonts:** [Anton](https://fonts.google.com/specimen/Anton) by Vernon Adams and [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) by Jeremy Tribby, both under the SIL Open Font License 1.1, bundled via `@fontsource`.
 * **Libraries:** Three.js (MIT), Rapier (Apache-2.0), React (MIT), Socket.IO (MIT), Vite (MIT).

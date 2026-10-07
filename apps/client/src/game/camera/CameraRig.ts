@@ -69,8 +69,8 @@ export class CameraRig {
       const fx = subject.x * 0.65;
       const fz = subject.z * 0.45;
       const height = 7 + bz * 1.0;
-      tmpPos.set(fx, height, fz - bz * 0.8 - 3);
-      tmpLook.set(fx, 0, fz - bz * 0.2);
+      tmpPos.set(fx, height, fz - bz * 0.75 - 2);
+      tmpLook.set(fx, 0, fz - bz * 0.05);
       if (aimPoint && !this.inspect.enabled) {
         tmpLook.x += (aimPoint.x - tmpLook.x) * 0.08 * this.sway;
         tmpLook.z += (aimPoint.z - tmpLook.z) * 0.08 * this.sway;
