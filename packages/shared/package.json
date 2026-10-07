@@ -10,6 +10,7 @@
     "test": "tsx src/tests/run.ts"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "tsx": "^4.19.2"
   }
 }
