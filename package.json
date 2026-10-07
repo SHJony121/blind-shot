@@ -1,0 +1,26 @@
+{
+  "name": "blind-shot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BLIND SHOT - a browser 3D multiplayer memory-shooting party game",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c yellow,cyan \"npm run dev -w @blindshot/server\" \"npm run dev -w @blindshot/client\"",
+    "dev:client": "npm run dev -w @blindshot/client",
+    "dev:server": "npm run dev -w @blindshot/server",
+    "build": "npm run build -w @blindshot/client && npm run build -w @blindshot/server",
+    "start": "npm run start -w @blindshot/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @blindshot/shared"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
