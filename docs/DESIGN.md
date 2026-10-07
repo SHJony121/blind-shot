@@ -63,7 +63,7 @@ The same `MatchSimulation` runs inside the browser for solo play and inside the 
 ## 4. Round state machine
 
 A **match** is first-to-N round wins (default 3, i.e. best of 5).
-A **round** is played until one subject (or team) remains. It is made of one or more **shots** (volleys); every alive subject fires exactly **once per shot**. Most rounds take 1–3 shots ≈ 15–40 s.
+A **round** is played until one subject (or team) remains. It is made of one or more **shots** (volleys); every alive subject fires exactly **once per shot**. Most rounds take 1–3 shots ≈ 15–40 s (measured with `packages/shared/src/tests/balance.ts`).
 
 ```
 ROUND_INTRO (1.6s, "ROUND 03 / BLIND SHOT / MEMORIZE YOUR TARGET")
@@ -73,8 +73,8 @@ ROUND_INTRO (1.6s, "ROUND 03 / BLIND SHOT / MEMORIZE YOUR TARGET")
   → BLIND (0.8s, "TARGETS HIDDEN")
   → COUNTDOWN (3s, "SHOOTOUT IN 3·2·1")
   → FIRE (instant: snapshot + two-step resolution)
-  → RESOLUTION (1.4s, flashes, tracers, ragdolls)
-  → REVEAL (1.6s, everyone visible, "2 SURVIVORS")
+  → RESOLUTION (1.2s, flashes, tracers, ragdolls)
+  → REVEAL (1.5s, everyone visible, "2 SURVIVORS")
       ├─ >1 side alive → next shot: VISIBLE (shot counter +1)
       └─ ≤1 side alive → ROUND_RESULTS (3s, "SUBJECT 02 WINS / NEXT ROUND IN 3")
            ├─ someone reached N wins → MATCH_END
@@ -118,8 +118,8 @@ Bots read the **same filtered view** a human would (no wall-hacks). Each bot kee
 | | Easy | Normal | Hard |
 |---|---|---|---|
 | Reaction delay | 0.6–1.1 s | 0.3–0.6 s | 0.15–0.3 s |
-| Memory noise | 1.4 m | 0.6 m | 0.25 m |
-| Aim error | ±9° | ±4.5° | ±2° |
+| Memory noise | 0.75 m | 0.3 m | 0.12 m |
+| Aim error | ±4.5° | ±2.2° | ±1.1° |
 | Wrong-target chance | 30% | 10% | 3% |
 | Predicts movement | no | velocity × 0.5 | velocity + dodge guess |
 | Dodges when aimed at | rarely | sometimes | often |
