@@ -57,7 +57,7 @@ export class CameraRig {
   update(
     dt: number,
     subject: Vec2 | null,
-    aimPoint: Vec2 | null,
+    _aimPoint: Vec2 | null,
     shake: THREE.Vector3,
   ): void {
     const { x: bx, z: bz } = this.bounds;
@@ -71,10 +71,6 @@ export class CameraRig {
       const height = 7 + bz * 1.0;
       tmpPos.set(fx, height, fz - bz * 0.75 - 2);
       tmpLook.set(fx, 0, fz - bz * 0.05);
-      if (aimPoint && !this.inspect.enabled) {
-        tmpLook.x += (aimPoint.x - tmpLook.x) * 0.08 * this.sway;
-        tmpLook.z += (aimPoint.z - tmpLook.z) * 0.08 * this.sway;
-      }
       this.applyInspect(dt);
       this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 5);
     } else if (this.mode === 'spectate') {

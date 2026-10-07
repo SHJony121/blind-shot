@@ -14,7 +14,6 @@ export class AudioEngine {
   private reverbSend!: GainNode;
   private noiseBuffer!: AudioBuffer;
   private drone: { stop: () => void } | null = null;
-  private hum: { gain: GainNode; stop: () => void } | null = null;
   private volumes = { master: 0.8, sfx: 0.9, music: 0.5 };
   /** Recorded gunshot samples (public/sfx/gunshot-*.ogg). Synthesis is the fallback. */
   private shotSamples: AudioBuffer[] = [];
@@ -362,36 +361,6 @@ export class AudioEngine {
   stopAmbience(): void {
     this.drone?.stop();
     this.drone = null;
-  }
-
-  /** Subtle laser hum during the visible phase. */
-  setLaserHum(on: boolean): void {
-    const ctx = this.ctx;
-    if (!ctx) return;
-    if (on && !this.hum) {
-      const o = ctx.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = 118;
-      const f = ctx.createBiquadFilter();
-      f.type = 'bandpass';
-      f.frequency.value = 900;
-      f.Q.value = 4;
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      gain.gain.setTargetAtTime(0.035, ctx.currentTime, 0.2);
-      o.connect(f).connect(gain).connect(this.sfx);
-      o.start();
-      this.hum = {
-        gain,
-        stop: () => {
-          gain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
-          o.stop(ctx.currentTime + 0.3);
-        },
-      };
-    } else if (!on && this.hum) {
-      this.hum.stop();
-      this.hum = null;
-    }
   }
 
   /** Heartbeat used during the blind phase. */

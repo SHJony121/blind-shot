@@ -1,7 +1,8 @@
-import { randomSpawns } from '../../arena/arena';
+import { randomSpawns, resolveCollisions } from '../../arena/arena';
 import {
   MAX_SHOTS_PER_ROUND,
-  arenaScaleForRound,
+  arenaScaleForVolley,
+  PLAYER_HIT_RADIUS,
   PHASE_DURATIONS,
   SCORE,
   SHOT_INTERVAL,
@@ -39,6 +40,8 @@ export class BlindShotMode implements GameMode {
 
   private ctx!: ModeContext;
   private matchOver = false;
+  /** Volleys fired so far this match: drives the shrinking arena. */
+  private volleysPlayed = 0;
   /** Sequential volley state. */
   private queue: string[] = [];
   private volleyTotal = 0;
@@ -50,6 +53,7 @@ export class BlindShotMode implements GameMode {
     this.round = 0;
     this.shot = 0;
     this.matchOver = false;
+    this.volleysPlayed = 0;
     this.teamWins = ctx.config.mode === 'TEAMS' ? { 1: 0, 2: 0 } : {};
     this.phase = 'WAITING';
   }
@@ -57,8 +61,8 @@ export class BlindShotMode implements GameMode {
   startRound(): void {
     this.round += 1;
     this.shot = 1;
-    // Every round the walls close in a little.
-    this.ctx.setArenaScale(arenaScaleForRound(this.round));
+    // The arena keeps the size it shrank to; spawns happen inside it.
+    this.ctx.setArenaScale(arenaScaleForVolley(this.volleysPlayed));
     const players = [...this.ctx.players.values()];
     const spawns = randomSpawns(
       this.ctx.arena,
@@ -164,10 +168,12 @@ export class BlindShotMode implements GameMode {
         return this.beginShooting();
       case 'SHOOTING':
         if (config.fireOrder === 'SEQUENTIAL') this.awardSurvivors(this.alivePlayers());
+        this.volleysPlayed += 1;
         return this.enter('REVEAL', PHASE_DURATIONS.REVEAL);
       case 'REVEAL':
         if (this.aliveSides().length <= 1 || this.shot >= MAX_SHOTS_PER_ROUND) return this.endRound();
         this.shot += 1;
+        this.shrinkArena();
         return this.enter('VISIBLE', config.visibleSeconds);
       case 'ROUND_RESULTS':
         if (this.matchOver) return this.endMatch();
@@ -175,6 +181,12 @@ export class BlindShotMode implements GameMode {
       default:
         return undefined;
     }
+  }
+
+  /** Close the boundary in after a volley and push anyone now outside back onto the floor. */
+  private shrinkArena(): void {
+    this.ctx.setArenaScale(arenaScaleForVolley(this.volleysPlayed));
+    for (const p of this.alivePlayers()) p.pos = resolveCollisions(this.ctx.arena, p.pos, PLAYER_HIT_RADIUS);
   }
 
   private enter(phase: Phase, duration: number): void {

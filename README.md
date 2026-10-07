@@ -38,14 +38,14 @@ Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultane
 
 | Map | Size | Layout |
 |---|---|---|
-| **White Room** (default) | 32 × 32 m | Bright white checker floor under an open sky, low white walls, a few blocks and posts |
+| **White Room** (default) | 32 × 32 m | Bright white checker floor under an open sky, no walls (an orange boundary line), a few blocks and posts |
 | **Test Chamber 01** | 28 × 28 m | Open square floor with 4 pillars and 2 low blocks |
 | **Factory Floor** | 36 × 26 m | Long brick hall with crates and steel columns to hide behind |
 | **Cooling Room** | 30 × 30 m | Tiled reactor room with a central core and big coolant tanks |
 
 A match is **first to 3 round wins** (best of 5). Hosts can change this.
 
-**The arena shrinks every round.** Each new round of a match pulls the walls in by 12% (down to half size), so later rounds get tighter and more tense. Obstacles that no longer fit are removed. The size resets for the next match.
+**The arena shrinks after every volley.** After each round of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in, and obstacles that no longer fit are removed. The size resets for the next match. On the White Room the edge is a bold orange line on the floor (no raised walls), with greyed-out floor beyond it.
 
 ## Characters
 

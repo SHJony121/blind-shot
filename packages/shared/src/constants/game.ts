@@ -46,11 +46,14 @@ export const MAX_BLIND_SECONDS = 15;
 /** A round that has not produced a winner after this many shots is a draw. */
 export const MAX_SHOTS_PER_ROUND = 6;
 
-/** The arena shrinks every round of a match: scale = max(MIN, 1 - STEP * (round - 1)). */
-export const ARENA_SHRINK_PER_ROUND = 0.12;
-export const MIN_ARENA_SCALE = 0.5;
-export const arenaScaleForRound = (round: number): number =>
-  Math.max(MIN_ARENA_SCALE, 1 - ARENA_SHRINK_PER_ROUND * Math.max(0, round - 1));
+/**
+ * The arena shrinks after every volley of a match (it never grows back mid-match):
+ * scale = max(MIN, 1 - STEP * volleysPlayed). A fresh match starts at full size.
+ */
+export const ARENA_SHRINK_PER_VOLLEY = 0.1;
+export const MIN_ARENA_SCALE = 0.4;
+export const arenaScaleForVolley = (volleysPlayed: number): number =>
+  Math.max(MIN_ARENA_SCALE, 1 - ARENA_SHRINK_PER_VOLLEY * Math.max(0, volleysPlayed));
 
 /** Selectable character looks (all original designs). */
 export const SKINS = ['DUMMY', 'ROBOT', 'ASTRO', 'WORKER', 'BEANIE', 'CAT'] as const;

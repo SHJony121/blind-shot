@@ -52,9 +52,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
       <Field label="MOUSE SENSITIVITY">
         <Slider value={s.mouseSensitivity} min={0.2} max={3} step={0.1} format={(v) => v.toFixed(1)} onChange={(mouseSensitivity) => set({ mouseSensitivity })} />
       </Field>
-      <Field label="CAMERA SWAY">
-        <Slider value={s.cameraSway} min={0} max={1} step={0.05} format={pct} onChange={(cameraSway) => set({ cameraSway })} />
-      </Field>
       <Field label="SCREEN SHAKE">
         <Seg
           value={s.screenShake}

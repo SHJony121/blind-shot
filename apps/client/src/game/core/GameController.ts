@@ -25,7 +25,7 @@ import { shade } from '../characters/materials';
 import { SubjectView } from '../characters/SubjectView';
 import { BlindShotPresenter } from '../modes/blindShot/BlindShotPresenter';
 import type { GameSession } from '../../networking/GameSession';
-import { hudStore, initialHud } from '../../state/hud';
+import { hudStore, initialHud, showBanner } from '../../state/hud';
 import { settingsStore } from '../../state/settings';
 import type { ClientWorld } from './ClientWorld';
 
@@ -54,6 +54,7 @@ export class GameController {
   private viewReceivedAt = 0;
   /** Subjects that already fired in the current volley (their laser switches off). */
   private fired = new Set<string>();
+  private lastArenaScale = 0;
   private clock = 0;
   private timeline: Scheduled[] = [];
   private paused = false;
@@ -128,7 +129,6 @@ export class GameController {
     this.world.chamber.setMood('menu');
     this.world.chamber.setDisplay('WHITE ROOM', 'SUBJECTS STAND BY');
     this.world.effects.clearDecals();
-    audio.setLaserHum(false);
     hudStore.set(initialHud());
   }
 
@@ -140,11 +140,14 @@ export class GameController {
     this.viewReceivedAt = performance.now() / 1000;
     this.roster.clear();
     for (const p of view.roster) this.roster.set(p.id, p);
-    // Build the right arena (it shrinks every round) while no ragdoll is lying around.
-    if (this.views.size === 0 || view.phase === 'ROUND_INTRO') {
-      if (this.views.size === 0) this.world.chamber.setMood('normal');
-      this.world.setArena(view.config.mapId, view.arenaScale);
+    // Build the right arena. It shrinks after every volley; the edge slides in on screen.
+    if (this.views.size === 0 && this.lastArenaScale === 0) this.world.chamber.setMood('normal');
+    if (this.lastArenaScale !== 0 && view.arenaScale < this.lastArenaScale - 1e-6) {
+      showBanner('ARENA SHRINKING', { size: 'md', tone: 'danger' });
+      audio.whoosh();
     }
+    this.lastArenaScale = view.arenaScale;
+    this.world.setArena(view.config.mapId, view.arenaScale);
 
     const present = new Set<string>();
     for (const body of view.bodies) {

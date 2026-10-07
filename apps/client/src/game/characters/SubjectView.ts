@@ -120,7 +120,7 @@ export class SubjectView {
   hideNow(): void {
     this.presence = 'hidden';
     this.model.root.visible = false;
-    this.laser.setActive(false);
+    this.laser.hideNow();
   }
 
   setGhost(ghost: boolean): void {
@@ -130,7 +130,9 @@ export class SubjectView {
   }
 
   kill(physics: PhysicsWorld | null, dir: THREE.Vector3, strength: number): void {
-    this.laser.setActive(false);
+    // Ragdolls skip the per-frame laser update, so switch the beam off instantly
+    // (a fading beam would otherwise stay frozen on screen).
+    this.laser.hideNow();
     this.tag.visible = false;
     this.ring.visible = false;
     if (!physics || this.ragdoll) return;

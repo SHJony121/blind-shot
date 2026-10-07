@@ -67,6 +67,10 @@ const THEMES: Record<ArenaTheme, ThemeStyle> = {
 export class ArenaView {
   readonly group = new THREE.Group();
   readonly ventPositions: THREE.Vector3[] = [];
+  /** Floor + boundary: animated when the arena shrinks between volleys. */
+  private readonly edge = new THREE.Group();
+  private edgeFrom = { x: 1, z: 1 };
+  private edgeT = 1;
 
   private readonly key: THREE.DirectionalLight;
   private readonly fill: THREE.DirectionalLight;
@@ -141,6 +145,7 @@ export class ArenaView {
       this.group.add(red);
     }
 
+    this.group.add(this.edge);
     this.buildFloor();
     this.buildWalls();
     for (const ob of arena.obstacles) this.buildObstacle(ob);
@@ -162,6 +167,13 @@ export class ArenaView {
   /** Bright (daylight) map: lasers switch to solid colours so they read on white. */
   get bright(): boolean {
     return this.style.bright;
+  }
+
+  /** Slide the floor edge / walls in from the previous (bigger) size. */
+  animateFrom(oldHalfX: number, oldHalfZ: number): void {
+    this.edgeFrom = { x: oldHalfX / this.arena.halfX, z: oldHalfZ / this.arena.halfZ };
+    this.edgeT = 0;
+    this.edge.scale.set(this.edgeFrom.x, 1, this.edgeFrom.z);
   }
 
   get currentMood(): LightMood {
@@ -210,6 +222,11 @@ export class ArenaView {
 
   update(dt: number): void {
     this.time += dt;
+    if (this.edgeT < 1) {
+      this.edgeT = Math.min(1, this.edgeT + dt / 1.4);
+      const e = 1 - (1 - this.edgeT) ** 3;
+      this.edge.scale.set(this.edgeFrom.x + (1 - this.edgeFrom.x) * e, 1, this.edgeFrom.z + (1 - this.edgeFrom.z) * e);
+    }
     const target = (this.style.bright ? BRIGHT_MOODS : MOODS)[this.mood];
     const k = Math.min(1, dt * 5);
     for (const key of Object.keys(this.levels) as (keyof MoodLevels)[]) {
@@ -269,10 +286,10 @@ export class ArenaView {
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
-    this.group.add(floor);
+    this.edge.add(floor);
 
-    // Hazard border along every wall (a plain thin trim on bright maps).
-    const band = this.style.bright ? 0.4 : 0.9;
+    // Hazard border along every wall. Bright maps have no walls: a bold boundary line marks the edge.
+    const band = this.style.bright ? 0.35 : 0.9;
     for (const [w, d, x, z] of [
       [hx * 2, band, 0, -hz + band / 2],
       [hx * 2, band, 0, hz - band / 2],
@@ -283,14 +300,14 @@ export class ArenaView {
       const strip = new THREE.Mesh(
         new THREE.PlaneGeometry(long ? w : d, long ? d : w),
         this.style.bright
-          ? new THREE.MeshStandardMaterial({ color: '#c9d1d8', roughness: 0.8 })
+          ? new THREE.MeshBasicMaterial({ color: '#ff6b3d' })
           : new THREE.MeshStandardMaterial({ map: hazardStripeTexture(Math.max(w, d) / 1.6), roughness: 0.7 }),
       );
       strip.rotation.x = -Math.PI / 2;
       if (!long) strip.rotation.z = Math.PI / 2;
       strip.position.set(x, 0.01, z);
       strip.receiveShadow = true;
-      this.group.add(strip);
+      this.edge.add(strip);
     }
 
     if (this.style.emblem) {
@@ -307,7 +324,10 @@ export class ArenaView {
     // Dark void around the room (visible through the open near side).
     const outside = new THREE.Mesh(
       new THREE.PlaneGeometry(400, 400),
-      this.style.bright ? new THREE.MeshStandardMaterial({ color: '#9fb3c2', roughness: 1 }) : new THREE.MeshBasicMaterial({ color: '#07090b' }),
+      this.style.bright
+        ? // Out of bounds: the same checker, greyed out, so the shrinking edge is easy to see.
+          new THREE.MeshStandardMaterial({ map: floorTexture('clean', 100, 100), color: '#aab4bd', roughness: 1 })
+        : new THREE.MeshBasicMaterial({ color: '#07090b' }),
     );
     outside.receiveShadow = this.style.bright;
     outside.rotation.x = -Math.PI / 2;
@@ -326,6 +346,8 @@ export class ArenaView {
       { w: hz * 2, x: hx, z: 0, rot: -Math.PI / 2 },
     ];
     for (const wall of walls) {
+      // Bright maps are open: no raised walls at all, just the boundary line on the floor.
+      if (this.style.bright) continue;
       const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(wall.w, h),
         new THREE.MeshStandardMaterial({ map: this.style.wall(this.style.label, wall.w / 12), roughness: 0.85, metalness: 0.15 }),
@@ -333,17 +355,7 @@ export class ArenaView {
       mesh.position.set(wall.x, h / 2, wall.z);
       mesh.rotation.y = wall.rot;
       mesh.receiveShadow = true;
-      this.group.add(mesh);
-      if (this.style.bright) {
-        // Low white walls get a solid cap so they read from the high camera.
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(wall.w + 0.6, 0.3, 0.6), toon('#ffffff'));
-        cap.position.set(wall.x, h, wall.z);
-        cap.rotation.y = wall.rot;
-        cap.translateZ(-0.3);
-        cap.castShadow = true;
-        this.group.add(cap);
-        continue;
-      }
+      this.edge.add(mesh);
       // Nothing is mounted on the camera-side wall: it would sit between the camera and the floor.
       if (wall.z < 0 && wall.x === 0) continue;
 
@@ -352,7 +364,7 @@ export class ArenaView {
       lamp.position.set(wall.x, h - 0.6, wall.z);
       lamp.rotation.y = wall.rot;
       lamp.translateZ(0.3);
-      this.group.add(lamp);
+      this.edge.add(lamp);
 
       // Pipes running along the wall.
       const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, wall.w, 12), toon('#59646d'));
@@ -362,7 +374,7 @@ export class ArenaView {
       holder.position.set(wall.x, h - 1.5, wall.z);
       holder.rotation.y = wall.rot;
       holder.translateZ(0.45);
-      this.group.add(holder);
+      this.edge.add(holder);
     }
 
     if (this.style.bright) {

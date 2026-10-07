@@ -68,6 +68,9 @@ export class ClientWorld {
   setArena(id: MapId, scale = 1): void {
     const key = `${id}@${scale.toFixed(3)}`;
     if (key === this.arenaKey) return;
+    const sameMap = this.arena.id === id;
+    const oldHalfX = this.arena.halfX;
+    const oldHalfZ = this.arena.halfZ;
     this.arenaKey = key;
     const mood = this.chamber.currentMood;
     this.arena = scaleArena(getArena(id), scale);
@@ -77,9 +80,15 @@ export class ClientWorld {
     this.chamber.applyEnvironment(this.engine.scene);
     this.chamber.setMood(mood);
     this.effects.setBright(this.chamber.bright);
-    this.physics?.dispose();
-    this.physics = this.rapier ? new PhysicsWorld(this.rapier, this.arena) : null;
-    this.effects.clearDecals();
+    if (sameMap && this.physics) {
+      // Same map, new size: keep ragdolls, swap the static colliders and slide the edge in.
+      this.physics.setArena(this.arena);
+      this.chamber.animateFrom(oldHalfX, oldHalfZ);
+    } else {
+      this.physics?.dispose();
+      this.physics = this.rapier ? new PhysicsWorld(this.rapier, this.arena) : null;
+      this.effects.clearDecals();
+    }
   }
 
   start(): void {

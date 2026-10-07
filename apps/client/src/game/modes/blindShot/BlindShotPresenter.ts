@@ -48,10 +48,8 @@ export class BlindShotPresenter {
         c.setDisplay('MEMORIZE', e.shot > 1 ? `SHOT ${e.shot}` : 'TARGETS VISIBLE');
         showBanner('AIM.', { subtitle: e.shot > 1 ? `SHOT ${e.shot} · MEMORIZE THEIR POSITIONS` : 'MEMORIZE THEIR POSITIONS', size: 'lg' });
         hudStore.set({ reveal: null, popup: null });
-        audio.setLaserHum(true);
         break;
       case 'HIDE':
-        audio.setLaserHum(false);
         audio.lightsOff();
         c.flicker(0.45);
         c.setMood('blind');
@@ -86,7 +84,6 @@ export class BlindShotPresenter {
         c.setDisplay('TEST COMPLETE', `ROUND ${pad2(e.round)}`);
         break;
       case 'MATCH_END':
-        audio.setLaserHum(false);
         c.setMood('menu');
         c.setDisplay('TEST COMPLETE', 'THANK YOU, SUBJECTS');
         clearBanner();

@@ -53,6 +53,13 @@ export class LaserSight {
     this.dotMat.color.set(color);
   }
 
+  /** Switch off immediately (no fade). */
+  hideNow(): void {
+    this.targetOpacity = 0;
+    this.opacity = 0;
+    this.group.visible = false;
+  }
+
   /** `strength` 0..1 — 1 = full laser, ~0.3 = faint (teammate ghosts). */
   setActive(active: boolean, strength = 1): void {
     this.targetOpacity = active ? strength : 0;
