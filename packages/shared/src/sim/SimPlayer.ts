@@ -30,11 +30,13 @@ export const toPlayerInfo = (p: SimPlayer): PlayerInfo => ({
   subject: p.subject,
   colorIndex: p.colorIndex,
   team: p.team,
+  padIndex: p.padIndex,
   isBot: p.isBot,
   botDifficulty: p.botDifficulty,
   connected: p.connected,
   isHost: p.isHost,
   alive: p.alive,
+  inRound: p.inRound,
   stats: { ...p.stats },
 });
 

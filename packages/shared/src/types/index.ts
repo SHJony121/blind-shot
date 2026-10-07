@@ -66,11 +66,15 @@ export interface PlayerInfo {
   subject: number;
   colorIndex: number;
   team: TeamId;
+  /** Spawn pad (spawn positions are public: everybody sees them at round start). */
+  padIndex: number;
   isBot: boolean;
   botDifficulty: BotDifficulty | null;
   connected: boolean;
   isHost: boolean;
   alive: boolean;
+  /** Took part in the current round. */
+  inRound: boolean;
   stats: PlayerStats;
 }
 

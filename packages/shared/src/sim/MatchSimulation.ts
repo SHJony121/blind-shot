@@ -7,6 +7,8 @@ import type { GameMode, ModeContext } from '../modes/GameMode';
 import { Rng } from '../util/rng';
 import type { MatchConfig, MatchEvent, MatchView, Phase, PlayerInput, PlayerSeed, TeamId } from '../types';
 import { stepMovement } from './movement';
+
+const MAX_QUEUED_INPUTS = 6;
 import { toPlayerInfo, type SimPlayer } from './SimPlayer';
 import { visibleBodies } from './visibility';
 
@@ -23,6 +25,7 @@ export class MatchSimulation {
   private readonly mode: GameMode;
   private readonly bots = new Map<string, BotBrain>();
   private events: MatchEvent[] = [];
+  private readonly inputQueues = new Map<string, PlayerInput[]>();
 
   constructor(
     readonly config: MatchConfig,
@@ -87,17 +90,37 @@ export class MatchSimulation {
     return this.mode.isFinished();
   }
 
-  /** Store the latest input for a subject. Out-of-order inputs are ignored. */
-  setInput(id: string, input: PlayerInput): void {
+  /**
+   * Queue an input from a human subject. Each queued input represents exactly one
+   * simulation tick, so client prediction can replay unacknowledged inputs precisely.
+   * Out-of-order / duplicate inputs are ignored; the queue is bounded so a client
+   * cannot bank inputs to move faster than everyone else.
+   */
+  queueInput(id: string, input: PlayerInput): void {
     const p = this.players.get(id);
     if (!p || p.isBot) return;
-    if (input.seq <= p.lastSeq) return;
-    p.lastSeq = input.seq;
-    p.input = input;
+    const queue = this.inputQueues.get(id) ?? [];
+    const lastQueued = queue[queue.length - 1]?.seq ?? p.lastSeq;
+    if (input.seq <= lastQueued) return;
+    queue.push(input);
+    if (queue.length > MAX_QUEUED_INPUTS) queue.splice(0, queue.length - MAX_QUEUED_INPUTS);
+    this.inputQueues.set(id, queue);
   }
 
   tick(dt: number): void {
     this.time += dt;
+
+    for (const p of this.players.values()) {
+      if (p.isBot) continue;
+      const next = this.inputQueues.get(p.id)?.shift();
+      if (next) {
+        p.input = next;
+        p.lastSeq = next.seq;
+      } else {
+        // No input this tick (packet loss / idle): keep aim, stop moving.
+        p.input = { ...p.input, moveX: 0, moveZ: 0, sprint: false };
+      }
+    }
 
     for (const [id, brain] of this.bots) {
       const p = this.players.get(id);
@@ -155,6 +178,7 @@ export class MatchSimulation {
     p.connected = connected;
     if (!connected) {
       p.input = { ...p.input, moveX: 0, moveZ: 0, sprint: false };
+      this.inputQueues.delete(id);
       if (p.alive) this.mode.onPlayerRemoved(id);
     }
   }

@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "blindshot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "client",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:client"
+      ],
+      "port": 5173,
+      "env": {
+        "BLINDSHOT_SHOT_DIR": "C:/Users/JONY/AppData/Local/Temp/claude/C--Users-JONY-Documents-Shoot-Blind/594cdba2-78c4-4501-8542-43f82b121bc9/scratchpad/shots"
+      }
+    }
+  ]
+}
