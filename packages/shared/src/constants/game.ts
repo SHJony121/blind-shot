@@ -23,8 +23,8 @@ export const PHASE_DURATIONS = {
   HIDE: 0.7,
   BLIND: 0.8,
   FIRE: 0.05,
-  RESOLUTION: 1.5,
-  REVEAL: 1.7,
+  RESOLUTION: 1.2,
+  REVEAL: 1.5,
   ROUND_RESULTS: 3.2,
 } as const;
 
