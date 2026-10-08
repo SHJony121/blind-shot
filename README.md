@@ -49,7 +49,20 @@ A match is **first to 3 round wins** (best of 5). Hosts can change this.
 
 ## Characters
 
-Pick your look on the main menu (◀ ▶ under your name). It is saved in your browser and other players see it online. There are six original designs: **Test Dummy**, **Unit Bot**, **Astro**, **Hard Hat**, **Beanie** and **Kitty**. Bots pick a random look.
+Pick your character on the main menu (◀ ▶ under your name). The choice is saved in your browser, and other players see it online. Bots pick at random. All eight are original designs with their own body shapes:
+
+| Character | Look |
+|---|---|
+| **Test Dummy** | The original round toon test subject in a jumpsuit, helmet and visor |
+| **The Blind** | Slim blocky figure, spiky white hair, black blindfold, dark outfit |
+| **Brawler** | Big chunky build, white headband, red shirt, green trousers |
+| **Agent** | Black suit, white shirt, red tie, shades, slicked hair |
+| **Punk** | Skinny, pink mohawk, open black jacket, jeans |
+| **Cowpoke** | Wide-brim hat, red bandana, rust shirt |
+| **Unit Bot** | Boxy metal robot with a screen face and an antenna |
+| **Astro** | Toon subject in a glass bubble helmet |
+
+In TEAMS mode the blocky characters wear their team colour as their shirt.
 
 ## Controls (desktop)
 

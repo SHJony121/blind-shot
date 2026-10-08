@@ -506,7 +506,7 @@ export class GameController {
     const label = isLocal ? 'YOU' : `${String(info.subject).padStart(2, '0')} ${info.name.toUpperCase()}`;
     const sv = new SubjectView(
       id,
-      { bodyColor: this.bodyColor(info), accentColor: SUBJECT_COLORS[info.colorIndex] ?? '#e3b23c', subject: info.subject, skin: info.skin },
+      { bodyColor: this.bodyColor(info), accentColor: SUBJECT_COLORS[info.colorIndex] ?? '#e3b23c', subject: info.subject, skin: info.skin, tint: this.view?.config.mode === 'TEAMS' && info.team !== 0 ? TEAM_COLORS[info.team] : undefined },
       label,
       this.laserColor(info),
       this.world.engine.scene,

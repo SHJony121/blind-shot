@@ -56,7 +56,7 @@ export const arenaScaleForVolley = (volleysPlayed: number): number =>
   Math.max(MIN_ARENA_SCALE, 1 - ARENA_SHRINK_PER_VOLLEY * Math.max(0, volleysPlayed));
 
 /** Selectable character looks (all original designs). */
-export const SKINS = ['DUMMY', 'ROBOT', 'ASTRO', 'WORKER', 'BEANIE', 'CAT'] as const;
+export const SKINS = ['DUMMY', 'BLIND', 'BRAWLER', 'AGENT', 'PUNK', 'COWBOY', 'ROBOT', 'ASTRO'] as const;
 export type SkinId = (typeof SKINS)[number];
 export const isSkin = (v: unknown): v is SkinId => typeof v === 'string' && (SKINS as readonly string[]).includes(v);
 

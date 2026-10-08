@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SkinId } from '@blindshot/shared';
 import { GunModel } from '../weapons/GunModel';
+import { BLOCKY_LOOKS, buildBlocky } from './blockyLooks';
 import { inkedMesh, shade, toon } from './materials';
 import { crashMarkerTexture, numberPatchTexture } from './textures';
 
@@ -42,11 +43,13 @@ const G = {
 
 export const SKIN_LABELS: Record<SkinId, string> = {
   DUMMY: 'TEST DUMMY',
+  BLIND: 'THE BLIND',
+  BRAWLER: 'BRAWLER',
+  AGENT: 'AGENT',
+  PUNK: 'PUNK',
+  COWBOY: 'COWPOKE',
   ROBOT: 'UNIT BOT',
   ASTRO: 'ASTRO',
-  WORKER: 'HARD HAT',
-  BEANIE: 'BEANIE',
-  CAT: 'KITTY',
 };
 
 export const SUBJECT_PART_NAMES = ['hips', 'torso', 'head', 'armL', 'armR', 'legL', 'legR'] as const;
@@ -57,6 +60,8 @@ export interface SubjectLook {
   accentColor: string;
   subject: number;
   skin?: SkinId;
+  /** Team colour: blocky characters wear it as their shirt in TEAMS mode. */
+  tint?: string;
 }
 
 interface HeadMaterials {
@@ -122,6 +127,13 @@ export class SubjectModel {
     this.parts = { hips, torso, head, armL, armR, legL, legR };
     for (const [name, g] of Object.entries(this.parts)) g.name = name;
 
+    const blocky = look.skin ? BLOCKY_LOOKS[look.skin] : undefined;
+    let shoulderX = 0.43;
+    if (blocky) {
+      const built = buildBlocky(this.parts, blocky, look.tint);
+      this.materials.push(...built.materials);
+      shoulderX = built.shoulderX;
+    } else {
     // Hips
     hips.position.y = 0.72;
     const pelvis = inkedMesh(G.pelvis, suitDark);
@@ -179,7 +191,7 @@ export class SubjectModel {
     this.buildHead(head, look.skin ?? 'DUMMY', { skin, helmetMat, rubber, visorMat, eyeMat, suit });
     torso.add(head);
 
-    // Arms: shoulder pivots; the static aim pose points both hands at the gun grip.
+    // Arms: shoulder pivots.
     for (const [arm, side] of [
       [armL, 1],
       [armR, -1],
@@ -192,8 +204,13 @@ export class SubjectModel {
       glove.position.y = -0.52;
       arm.add(upper, glove);
       torso.add(arm);
+    }
+    }
+
+    // The static aim pose points both hands at the gun grip (same for every character).
+    for (const side of [1, -1] as const) {
       const key = side === 1 ? 'L' : 'R';
-      const shoulder = new THREE.Vector3(0.43 * side, 0.6, 0);
+      const shoulder = new THREE.Vector3(shoulderX * side, 0.6, 0);
       const grip = new THREE.Vector3(0.07 * side, 0.27, 0.42);
       const dir = grip.sub(shoulder).normalize();
       this.armAim[key].setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
@@ -232,23 +249,6 @@ export class SubjectModel {
       head.add(sk);
     };
 
-    if (skin === 'ROBOT') {
-      const box = inkedMesh(G.robotHead, m.helmetMat, 0.02);
-      box.position.y = 0.36;
-      const screen = new THREE.Mesh(G.screen, m.visorMat);
-      screen.position.set(0, 0.36, 0.352);
-      for (const side of [1, -1]) {
-        const eye = new THREE.Mesh(G.eye, m.eyeMat);
-        eye.position.set(0.13 * side, 0.37, 0.36);
-        head.add(eye);
-      }
-      const antenna = new THREE.Mesh(G.antenna, m.rubber);
-      antenna.position.set(0.18, 0.82, 0);
-      const knob = new THREE.Mesh(G.knob, new THREE.MeshBasicMaterial({ color: '#ff4b3a' }));
-      knob.position.set(0.18, 0.98, 0);
-      head.add(box, screen, antenna, knob);
-      return;
-    }
     if (skin === 'ASTRO') {
       skull();
       face(0.38, 0.39);
@@ -263,31 +263,7 @@ export class SubjectModel {
       head.add(glass, ring);
       return;
     }
-    if (skin === 'WORKER') {
-      skull();
-      face(0.33, 0.39);
-      const hat = inkedMesh(G.hardHat, new THREE.MeshToonMaterial({ color: '#f2c230', gradientMap: (m.suit as THREE.MeshToonMaterial).gradientMap }), 0.02);
-      hat.position.y = 0.46;
-      const brim = new THREE.Mesh(G.brim, new THREE.MeshToonMaterial({ color: '#e0ad1c', gradientMap: (m.suit as THREE.MeshToonMaterial).gradientMap }));
-      brim.position.set(0, 0.47, 0.06);
-      head.add(hat, brim);
-      return;
-    }
-    if (skin === 'BEANIE') {
-      skull();
-      face(0.3, 0.39);
-      const hat = inkedMesh(G.beanie, m.helmetMat, 0.02);
-      hat.position.y = 0.43;
-      const fold = new THREE.Mesh(G.beanieFold, m.rubber);
-      fold.rotation.x = Math.PI / 2;
-      fold.position.y = 0.47;
-      const pom = inkedMesh(G.pompom, m.skin, 0.015);
-      pom.position.y = 0.9;
-      head.add(hat, fold, pom);
-      return;
-    }
-
-    // DUMMY (default) and CAT: dummy face, coloured helmet, dark visor with two bright eyes.
+    // DUMMY (default): dummy face, coloured helmet, dark visor with two bright eyes.
     skull();
     const helmet = inkedMesh(G.helmet, m.helmetMat, 0.02);
     helmet.position.y = 0.36;
@@ -301,13 +277,7 @@ export class SubjectModel {
       const eye = new THREE.Mesh(G.eye, m.eyeMat);
       eye.position.set(0.12 * side, 0.31, 0.415);
       head.add(eye);
-      if (skin === 'CAT') {
-        const ear = inkedMesh(G.ear, m.helmetMat, 0.015);
-        ear.position.set(0.24 * side, 0.82, -0.02);
-        ear.rotation.z = -0.35 * side;
-        ear.rotation.y = Math.PI / 4;
-        head.add(ear);
-      } else {
+      {
         const marker = new THREE.Mesh(G.marker, new THREE.MeshBasicMaterial({ map: crashMarkerTexture(), transparent: true }));
         marker.position.set(0.432 * side, 0.36, -0.02);
         marker.rotation.y = (Math.PI / 2) * side;
