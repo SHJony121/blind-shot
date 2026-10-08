@@ -4,6 +4,12 @@ import type { Vec2 } from '@blindshot/shared';
 export type CameraMode = 'player' | 'spectate' | 'menu';
 
 const tmpPos = new THREE.Vector3();
+const tmpV = new THREE.Vector3();
+const fitDir = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const fitPoints = Array.from({ length: 8 }, () => new THREE.Vector3());
+/** Default camera tilt above the horizon (radians). */
+const DEFAULT_ELEVATION = 0.98;
 const tmpLook = new THREE.Vector3();
 
 /**
@@ -30,6 +36,8 @@ export class CameraRig {
   private readonly pos = new THREE.Vector3(0, 9, -16);
   private readonly look = new THREE.Vector3(0, 1, 0);
   private menuT = 0;
+
+  private readonly probe = new THREE.PerspectiveCamera();
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
@@ -62,23 +70,14 @@ export class CameraRig {
     const { x: bx, z: bz } = this.bounds;
     // Match starting but no subject yet: hold still and keep the pending cut.
     if (this._mode === 'player' && !subject) return;
-    if (this.mode === 'player' && subject) {
-      // Overview of the whole floor that only leans a little toward your subject, so walking
-      // to one side never hides the other. Zoom / orbit (applyInspect) are always free.
-      const fx = subject.x * 0.3;
-      const fz = subject.z * 0.3;
-      const height = 6 + bz * 1.05;
-      tmpPos.set(fx, height, fz - bz * 1.0 - 3);
-      tmpLook.set(fx, 0, fz);
-      this.applyInspect(dt);
+    if (this.mode === 'player' || this.mode === 'spectate') {
+      // Auto-fit: the whole arena (every corner, with head-room for subjects) is always on
+      // screen at the default zoom, whatever the window shape. The view centres on the arena,
+      // leaning only slightly toward your subject. Zoom / orbit / tilt stay free on top.
+      const lean = this.mode === 'player' && subject ? 0.12 : 0;
+      tmpLook.set((subject?.x ?? 0) * lean, 0, (subject?.z ?? 0) * lean);
+      this.frameArena(dt, bx, bz);
       this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 5);
-    } else if (this.mode === 'spectate') {
-      // Spectating: the same free overview of the whole floor, centred on the arena.
-      tmpPos.set(0, 6 + bz * 1.15, -bz * 1.05 - 3);
-      tmpLook.set(0, 0, 0);
-      void bx;
-      this.applyInspect(dt);
-      this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 2);
     } else {
       // Menu: slow drift around the hero subject standing in front of the pillars.
       this.menuT += dt;
@@ -90,33 +89,64 @@ export class CameraRig {
     this.camera.lookAt(this.look);
   }
 
-  /** Bend the standard camera target by the inspect zoom / orbit (smoothed). */
-  private applyInspect(dt: number): void {
+  /**
+   * Place the camera on a sphere around tmpLook (yaw / tilt from the free-look controls),
+   * at the distance where every arena corner fits on screen, times the user's zoom.
+   */
+  private frameArena(dt: number, bx: number, bz: number): void {
     const i = this.inspect;
     const k = 1 - Math.exp(-10 * dt);
-    const on = i.enabled;
-    this.zoomS += ((on ? i.zoom : 1) - this.zoomS) * k;
-    this.yawS += ((on ? i.yaw : 0) - this.yawS) * k;
-    this.pitchS += ((on ? i.pitch : 0) - this.pitchS) * k;
-    const wantW = on && i.focus ? 1 - Math.min(1, this.zoomS) : 0;
+    this.zoomS += ((i.enabled ? i.zoom : 1) - this.zoomS) * k;
+    this.yawS += ((i.enabled ? i.yaw : 0) - this.yawS) * k;
+    this.pitchS += ((i.enabled ? i.pitch : 0) - this.pitchS) * k;
+    const elev = Math.max(0.05, Math.min(1.5, DEFAULT_ELEVATION + this.pitchS));
+    // Direction from the look point toward the camera (default: behind, on the -Z side).
+    fitDir.set(0, Math.sin(elev), -Math.cos(elev)).applyAxisAngle(UP, this.yawS);
+
+    const fit = this.fitDistance(tmpLook, fitDir, bx, bz);
+    const wantW = i.enabled && i.focus ? 1 - Math.min(1, this.zoomS) : 0;
     this.focusW += (wantW - this.focusW) * k;
     if (i.focus) this.focusS.set(i.focus.x, 0, i.focus.z);
-    // Look point slides toward the inspected spot as you zoom in.
     tmpLook.lerp(this.focusS, this.focusW);
-    // Orbit + zoom: rotate the offset around the look point, then scale it.
-    const off = tmpPos.clone().sub(tmpLook);
-    off.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawS);
-    const horiz = Math.hypot(off.x, off.z);
-    const elev = Math.atan2(off.y, horiz) + this.pitchS;
-    const len = off.length() * this.zoomS;
-    // Low enough to look out over the edge at the sky, high enough for a top-down view.
-    const clampedElev = Math.max(0.05, Math.min(1.5, elev));
-    const dirXZ = horiz > 1e-6 ? { x: off.x / horiz, z: off.z / horiz } : { x: 0, z: -1 };
-    tmpPos.set(
-      tmpLook.x + dirXZ.x * Math.cos(clampedElev) * len,
-      tmpLook.y + Math.sin(clampedElev) * len,
-      tmpLook.z + dirXZ.z * Math.cos(clampedElev) * len,
-    );
+    tmpPos.copy(tmpLook).addScaledVector(fitDir, fit * this.zoomS);
+  }
+
+  /** Smallest camera distance along `dir` at which all arena corners project inside the frame. */
+  private fitDistance(look: THREE.Vector3, dir: THREE.Vector3, bx: number, bz: number): number {
+    const probe = this.probe;
+    probe.fov = this.camera.fov;
+    probe.aspect = this.camera.aspect;
+    probe.near = 0.1;
+    probe.far = 500;
+    probe.updateProjectionMatrix();
+    const pts = fitPoints;
+    let n = 0;
+    for (const x of [-bx - 1, bx + 1]) {
+      for (const z of [-bz - 1, bz + 1]) {
+        for (const y of [0, 2.8]) pts[n++]!.set(x, y, z);
+      }
+    }
+    const fits = (d: number): boolean => {
+      probe.position.copy(look).addScaledVector(dir, d);
+      probe.lookAt(look);
+      probe.updateMatrixWorld(true);
+      for (const p of pts) {
+        tmpV.copy(p).project(probe);
+        // Leave a little room at the top and bottom for the HUD.
+        if (tmpV.z > 1 || Math.abs(tmpV.x) > 0.94 || tmpV.y > 0.84 || tmpV.y < -0.84) return false;
+        // Behind the camera also means "does not fit".
+        if (tmpV.copy(p).sub(probe.position).dot(dir) > 0) return false;
+      }
+      return true;
+    };
+    let lo = 4;
+    let hi = 300;
+    for (let it = 0; it < 22; it++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    return hi;
   }
 
   private damp(pos: THREE.Vector3, look: THREE.Vector3, dt: number, rate: number): void {
