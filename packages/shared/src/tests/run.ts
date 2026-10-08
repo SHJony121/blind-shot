@@ -7,7 +7,7 @@ import { dirToYaw, sub } from '../math/vec';
 import { collectEliminations, computeShots } from '../sim/shotResolution';
 import { MatchSimulation } from '../sim/MatchSimulation';
 import { sanitizeName, normalizeRoomCode } from '../util/names';
-import type { MatchEvent } from '../types';
+import { AIM_PHASES, MOVE_PHASES, type MatchEvent } from '../types';
 
 let failures = 0;
 const test = (name: string, fn: () => void) => {
@@ -227,6 +227,14 @@ test('hidden phase: free to move, then positions lock for the countdown', () => 
   };
   assert(stepAndMeasure('REPOSITION') > 0.05, 'should move during REPOSITION');
   assert(stepAndMeasure('COUNTDOWN') < 1e-6, 'must not move during the locked COUNTDOWN');
+});
+
+test('phase rules: the locked countdown allows aiming but never movement', () => {
+  // The client predicts movement only in MOVE_PHASES; if this ever includes COUNTDOWN again the
+  // local subject would jitter (predicted forward, snapped back by the authority).
+  for (const p of ['COUNTDOWN', 'FREEZE', 'SHOOTING'] as const) assert(!MOVE_PHASES.has(p), `${p} must not allow movement`);
+  assert(AIM_PHASES.has('COUNTDOWN'), 'aiming stays allowed during the locked countdown');
+  assert(MOVE_PHASES.has('REPOSITION'), 'moving is allowed during the hidden reposition time');
 });
 
 test('names and room codes are sanitised', () => {

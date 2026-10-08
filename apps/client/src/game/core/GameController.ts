@@ -271,7 +271,7 @@ export class GameController {
       if (sv.ragdoll) continue;
       if (sv.id === localId && this.localAlive && AIM_PHASES.has(view.phase)) {
         const r = this.renderedLocal();
-        if (r) sv.setPose(r, this.aimYaw, this.pending.length > 0 && this.isMovingInput());
+        if (r) sv.setPose(r, this.aimYaw, MOVE_PHASES.has(view.phase) && this.pending.length > 0 && this.isMovingInput());
       } else {
         sv.sample(renderTime);
       }
@@ -323,7 +323,9 @@ export class GameController {
   private sampleLocalInput(dt: number, view: MatchView): void {
     const settings = settingsStore.get();
     const canAim = this.localAlive && AIM_PHASES.has(view.phase) && !this.paused;
-    const canMove = canAim;
+    // Same rule as the authority: no movement during the locked countdown / freeze. Predicting
+    // movement there made the server snap the subject back every snapshot (visible shaking).
+    const canMove = canAim && MOVE_PHASES.has(view.phase);
     const input = this.world.input;
     const me = this.renderedLocal();
 
