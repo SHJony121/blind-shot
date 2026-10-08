@@ -246,6 +246,24 @@ test('phase rules: the locked countdown freezes both movement and aim', () => {
   assert(MOVE_PHASES.has('REPOSITION'), 'moving is allowed during the hidden reposition time');
 });
 
+test('a solo match with an idle human plays every round to one matchEnded', () => {
+  const sim = new MatchSimulation(
+    { ...DEFAULT_MATCH_CONFIG, roundsToWin: 2 },
+    [{ id: 'h', name: 'Human', isBot: false }, ...[1, 2, 3].map((i) => ({ id: `b${i}`, name: `B${i}`, isBot: true }))],
+    21,
+  );
+  sim.start();
+  let ended = 0;
+  let waitingMidMatch = false;
+  for (let i = 0; i < 30 * 60 * 40 && !sim.finished; i++) {
+    sim.tick(1 / 30);
+    if (sim.phase === 'WAITING') waitingMidMatch = true;
+    for (const e of sim.drainEvents()) if (e.type === 'matchEnded') ended++;
+  }
+  assert(sim.finished && ended === 1, `match should end exactly once (ended=${ended})`);
+  assert(!waitingMidMatch, 'the match must never drop back to WAITING mid-way');
+});
+
 test('names and room codes are sanitised', () => {
   assert(sanitizeName('<script>alert(1)</script>') === 'scriptalert1sc', 'strips markup');
   assert(sanitizeName('   ') === 'Guest', 'falls back');

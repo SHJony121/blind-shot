@@ -131,6 +131,8 @@ export class GameController {
     this.world.chamber.setMood('menu');
     this.world.chamber.setDisplay('WHITE ROOM', 'SUBJECTS STAND BY');
     this.world.effects.clearDecals();
+    // The in-round tension drone belongs to the match: silence it when leaving.
+    audio.stopAmbience();
     hudStore.set(initialHud());
   }
 
