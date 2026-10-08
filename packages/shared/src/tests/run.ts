@@ -179,6 +179,28 @@ test('spawns stay inside the arena and clear of obstacles', () => {
   }
 });
 
+test('arena shrinks within a round and resets to full size each new round', () => {
+  const sim = new MatchSimulation(
+    { ...DEFAULT_MATCH_CONFIG, mapId: 'TEST_CHAMBER_01' },
+    [1, 2, 3, 4].map((i) => ({ id: `b${i}`, name: `B${i}`, isBot: true })),
+    11,
+  );
+  sim.start();
+  let shrunk = false;
+  let checkedReset = false;
+  for (let i = 0; i < 30 * 60 * 40 && !sim.finished && !checkedReset; i++) {
+    sim.tick(1 / 30);
+    if (sim.arenaScale < 1) shrunk = true;
+    for (const e of sim.drainEvents()) {
+      if (e.type === 'phaseChanged' && e.data.phase === 'ROUND_INTRO' && e.data.round > 1) {
+        assert(sim.arenaScale === 1, `round ${e.data.round} started at scale ${sim.arenaScale}`);
+        checkedReset = true;
+      }
+    }
+  }
+  assert(shrunk && checkedReset, 'expected a shrink and a later round reset');
+});
+
 test('names and room codes are sanitised', () => {
   assert(sanitizeName('<script>alert(1)</script>') === 'scriptalert1sc', 'strips markup');
   assert(sanitizeName('   ') === 'Guest', 'falls back');

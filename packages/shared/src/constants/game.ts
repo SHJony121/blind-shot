@@ -47,8 +47,8 @@ export const MAX_BLIND_SECONDS = 15;
 export const MAX_SHOTS_PER_ROUND = 6;
 
 /**
- * The arena shrinks after every volley of a match (it never grows back mid-match):
- * scale = max(MIN, 1 - STEP * volleysPlayed). A fresh match starts at full size.
+ * The arena shrinks after every volley of a round: scale = max(MIN, 1 - STEP * volleysPlayed).
+ * Every new round starts back at full size.
  */
 export const ARENA_SHRINK_PER_VOLLEY = 0.1;
 export const MIN_ARENA_SCALE = 0.4;

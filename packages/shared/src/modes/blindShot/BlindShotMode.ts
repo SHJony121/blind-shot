@@ -40,7 +40,7 @@ export class BlindShotMode implements GameMode {
 
   private ctx!: ModeContext;
   private matchOver = false;
-  /** Volleys fired so far this match: drives the shrinking arena. */
+  /** Volleys fired so far this round: drives the shrinking arena. */
   private volleysPlayed = 0;
   /** Sequential volley state. */
   private queue: string[] = [];
@@ -61,7 +61,8 @@ export class BlindShotMode implements GameMode {
   startRound(): void {
     this.round += 1;
     this.shot = 1;
-    // The arena keeps the size it shrank to; spawns happen inside it.
+    // Every round starts at full size again; it only shrinks volley by volley within a round.
+    this.volleysPlayed = 0;
     this.ctx.setArenaScale(arenaScaleForVolley(this.volleysPlayed));
     const players = [...this.ctx.players.values()];
     const spawns = randomSpawns(

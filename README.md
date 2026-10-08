@@ -45,7 +45,7 @@ Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultane
 
 A match is **first to 3 round wins** (best of 5). Hosts can change this.
 
-**The arena shrinks after every volley.** After each round of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in. The size resets for the next match. On the White Room the edge is a bold orange line, and beyond it there is only sky.
+**The arena shrinks after every volley.** After each volley of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in. Every new round starts again at full size. On the White Room the edge is a bold orange line, and beyond it there is only sky.
 
 ## Characters
 
