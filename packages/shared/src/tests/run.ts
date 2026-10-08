@@ -227,13 +227,22 @@ test('hidden phase: free to move, then positions lock for the countdown', () => 
   };
   assert(stepAndMeasure('REPOSITION') > 0.05, 'should move during REPOSITION');
   assert(stepAndMeasure('COUNTDOWN') < 1e-6, 'must not move during the locked COUNTDOWN');
+  const yawBefore = me.yaw;
+  for (let i = 0; i < 10; i++) {
+    sim.queueInput('h', { seq: ++seq, moveX: 0, moveZ: 0, sprint: false, yaw: yawBefore + 1 + i * 0.1 });
+    sim.tick(1 / 30);
+  }
+  assert(sim.phase !== 'COUNTDOWN' || me.yaw === yawBefore, 'aim must stay locked during the COUNTDOWN');
 });
 
-test('phase rules: the locked countdown allows aiming but never movement', () => {
+test('phase rules: the locked countdown freezes both movement and aim', () => {
   // The client predicts movement only in MOVE_PHASES; if this ever includes COUNTDOWN again the
   // local subject would jitter (predicted forward, snapped back by the authority).
-  for (const p of ['COUNTDOWN', 'FREEZE', 'SHOOTING'] as const) assert(!MOVE_PHASES.has(p), `${p} must not allow movement`);
-  assert(AIM_PHASES.has('COUNTDOWN'), 'aiming stays allowed during the locked countdown');
+  for (const p of ['COUNTDOWN', 'FREEZE', 'SHOOTING'] as const) {
+    assert(!MOVE_PHASES.has(p), `${p} must not allow movement`);
+    assert(!AIM_PHASES.has(p), `${p} must not allow aiming`);
+  }
+  assert(AIM_PHASES.has('REPOSITION'), 'aiming is allowed during the hidden move time');
   assert(MOVE_PHASES.has('REPOSITION'), 'moving is allowed during the hidden reposition time');
 });
 

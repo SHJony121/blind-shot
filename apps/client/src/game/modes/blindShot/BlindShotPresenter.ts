@@ -64,7 +64,7 @@ export class BlindShotPresenter {
         this.lastCountdown = 0;
         c.setMood('alert');
         audio.freeze();
-        showBanner('POSITIONS LOCKED', { subtitle: 'NOBODY CAN MOVE · KEEP AIMING', tone: 'danger', size: 'md' });
+        showBanner('LOCKED', { subtitle: 'NO MOVING · NO AIMING · YOU CAN STILL TURN THE CAMERA', tone: 'danger', size: 'md' });
         break;
       case 'FREEZE':
         hudStore.set({ popup: null, countdown: null });

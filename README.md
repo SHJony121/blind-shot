@@ -27,7 +27,7 @@ Every subject in the test chamber holds a gun with a laser sight. For a few seco
 | **Visible (5 s, up to 15 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
 | **Hide** | Warning tone, the lights flicker, and enemies vanish (`TARGETS HIDDEN`) |
 | **Hidden: move (5 s, 2–15 s)** | Enemies are truly gone. Everyone can still move to a new spot and aim. Popup: `MOVE · POSITIONS LOCK IN 5…1` |
-| **Hidden: locked countdown (5 s, up to 15 s)** | `POSITIONS LOCKED`: nobody can move any more, but you can still turn and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
+| **Hidden: locked countdown (5 s, up to 15 s)** | `LOCKED`: position and aim are frozen (only the camera view can still turn). Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
 | **Freeze (3 s)** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`). Scroll and drag to inspect the lasers |
 | **Shooting** | Subjects fire **one at a time** in a random order. A subject who gets shot before their turn never fires |
 | **Reveal** | `HIT!`, `MISS`, `EVERYBODY MISSED`, `2 SURVIVORS`… |

@@ -17,10 +17,10 @@ export type Phase =
 
 /** Phases during which enemies are hidden from every viewer. */
 export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'REPOSITION', 'COUNTDOWN']);
-/** Phases during which subjects can rotate / aim. FREEZE and SHOOTING lock every aim. */
-export const AIM_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'REPOSITION', 'COUNTDOWN']);
-/** Phases during which subjects can move. The hidden countdown locks positions (aim still free). */
+/** Phases during which subjects can move and aim. From the locked countdown on, both are frozen. */
 export const MOVE_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'REPOSITION']);
+/** Aiming follows the same rule as moving: the lock freezes position and aim together. */
+export const AIM_PHASES: ReadonlySet<Phase> = MOVE_PHASES;
 
 export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export type GameModeId = 'FFA' | 'TEAMS';
