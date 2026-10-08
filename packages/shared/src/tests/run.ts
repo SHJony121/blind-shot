@@ -8,6 +8,8 @@ import { collectEliminations, computeShots } from '../sim/shotResolution';
 import { MatchSimulation } from '../sim/MatchSimulation';
 import { sanitizeName, normalizeRoomCode } from '../util/names';
 import { AIM_PHASES, MOVE_PHASES, type MatchEvent } from '../types';
+import { stepMovement } from '../sim/movement';
+import { LOCK_GRACE_SECONDS } from '../constants/game';
 
 let failures = 0;
 const test = (name: string, fn: () => void) => {
@@ -226,6 +228,15 @@ test('hidden phase: free to move, then positions lock for the countdown', () => 
     return Math.hypot(me.pos.x - before.x, me.pos.z - before.z);
   };
   assert(stepAndMeasure('REPOSITION') > 0.05, 'should move during REPOSITION');
+  // Let the short lock grace window (for in-flight inputs) pass before checking the lock.
+  while (sim.phase !== 'COUNTDOWN') {
+    sim.queueInput('h', { seq: ++seq, moveX: 0, moveZ: 0, sprint: false, yaw: 0 });
+    sim.tick(1 / 30);
+  }
+  for (let i = 0; i < Math.ceil((LOCK_GRACE_SECONDS + 0.1) * 30); i++) {
+    sim.queueInput('h', { seq: ++seq, moveX: 0, moveZ: 0, sprint: false, yaw: 0 });
+    sim.tick(1 / 30);
+  }
   assert(stepAndMeasure('COUNTDOWN') < 1e-6, 'must not move during the locked COUNTDOWN');
   const yawBefore = me.yaw;
   for (let i = 0; i < 10; i++) {
@@ -262,6 +273,52 @@ test('a solo match with an idle human plays every round to one matchEnded', () =
   }
   assert(sim.finished && ended === 1, `match should end exactly once (ended=${ended})`);
   assert(!waitingMidMatch, 'the match must never drop back to WAITING mid-way');
+});
+
+/**
+ * A simulated client with network latency: it predicts its own movement, keeps sending
+ * inputs until it *sees* the lock (one latency late), and each input reaches the server one
+ * latency later. At the end the server's position must equal where the client left its subject.
+ */
+function lockMismatch(latencyTicks: number): number {
+  const sim = new MatchSimulation(
+    { ...DEFAULT_MATCH_CONFIG, mapId: 'TEST_CHAMBER_01', repositionSeconds: 2, blindSeconds: 3 },
+    [
+      { id: 'h', name: 'Human', isBot: false },
+      { id: 'b1', name: 'Bot1', isBot: true },
+    ],
+    9,
+  );
+  sim.start();
+  const me = sim.players.get('h')!;
+  const phaseLog: string[] = [];
+  const inFlight: { arrive: number; input: { seq: number; moveX: number; moveZ: number; sprint: boolean; yaw: number } }[] = [];
+  let predicted = { ...me.pos };
+  let seq = 0;
+  for (let tick = 0; tick < 30 * 40; tick++) {
+    // Deliver inputs that have finished their trip to the server.
+    while (inFlight.length > 0 && inFlight[0]!.arrive <= tick) sim.queueInput('h', inFlight.shift()!.input);
+    sim.tick(1 / 30);
+    phaseLog.push(sim.phase);
+    // The client sees the phase one latency late.
+    const seen = phaseLog[Math.max(0, tick - latencyTicks)]!;
+    if (MOVE_PHASES.has(seen as never)) {
+      const a = (tick / 30) * 2.1;
+      const cmd = { seq: ++seq, moveX: Math.cos(a), moveZ: Math.sin(a), sprint: tick % 40 < 10, yaw: a };
+      predicted = stepMovement(predicted, cmd, 1 / 30, sim.arena);
+      inFlight.push({ arrive: tick + latencyTicks, input: cmd });
+    }
+    // Compare a moment after the lock grace period has ended.
+    if (sim.phase === 'FREEZE') return Math.hypot(predicted.x - me.pos.x, predicted.z - me.pos.z);
+  }
+  throw new Error('never reached FREEZE');
+}
+
+test('locking freezes the subject exactly where the player sees it, even with latency', () => {
+  for (const latency of [0, 2, 3, 5]) {
+    const off = lockMismatch(latency);
+    assert(off < 1e-6, `latency ${latency * 33} ms: subject ended ${off.toFixed(3)} m from where the client left it`);
+  }
 });
 
 test('names and room codes are sanitised', () => {

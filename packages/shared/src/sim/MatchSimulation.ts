@@ -5,7 +5,7 @@ import { emptyStats } from '../gameState/config';
 import { BlindShotMode } from '../modes/blindShot/BlindShotMode';
 import type { GameMode, ModeContext } from '../modes/GameMode';
 import { Rng } from '../util/rng';
-import type { MatchConfig, MatchEvent, MatchView, Phase, PlayerInput, PlayerSeed, TeamId } from '../types';
+import { humanMayMove, type MatchConfig, type MatchEvent, type MatchView, type Phase, type PlayerInput, type PlayerSeed, type TeamId } from '../types';
 import { stepMovement } from './movement';
 import { toPlayerInfo, type SimPlayer } from './SimPlayer';
 import { visibleBodies } from './visibility';
@@ -137,11 +137,15 @@ export class MatchSimulation {
       p.input = brain.update(dt, this.buildView(id));
     }
 
-    const canMove = this.mode.canMove();
-    const canAim = this.mode.canAim();
+    const modeCanMove = this.mode.canMove();
+    const modeCanAim = this.mode.canAim();
+    // Humans get a short grace window at the lock so their in-flight inputs still count.
+    const humanGrace = humanMayMove(this.mode.phase, this.mode.phaseElapsed);
     for (const p of this.players.values()) {
       p.moving = false;
       if (!p.alive || !p.inRound) continue;
+      const canAim = modeCanAim || (humanGrace && !p.isBot);
+      const canMove = modeCanMove || (humanGrace && !p.isBot);
       if (canAim) p.yaw = p.input.yaw;
       if (canMove) {
         const next = stepMovement(p.pos, p.input, dt, this.arena);

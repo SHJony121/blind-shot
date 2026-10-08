@@ -27,6 +27,15 @@ export const PHASE_DURATIONS = {
   ROUND_RESULTS: 3.2,
 } as const;
 
+/**
+ * Network grace at the lock. A human's last inputs are still in flight when the lock starts
+ * (they were sent before that player saw it), so for this long the server still applies
+ * queued human movement and aim. Without it, the subject would snap back to the last
+ * position the server had at the lock instead of freezing where the player saw it.
+ * It is a hard cap: inputs arriving later are ignored (about 2 m of extra movement at most).
+ */
+export const LOCK_GRACE_SECONDS = 0.4;
+
 /** Sequential shooting: delay before the first shot, gap between shots, pause after the last. */
 export const SHOT_LEAD_IN = 0.35;
 export const SHOT_INTERVAL = 0.85;

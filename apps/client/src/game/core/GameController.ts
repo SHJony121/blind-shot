@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   AIM_PHASES,
+  humanMayMove,
   HIDDEN_PHASES,
   MOVE_PHASES,
   MUZZLE_HEIGHT,
@@ -171,7 +172,10 @@ export class GameController {
     // Local reconciliation: rewind to the authoritative position, replay unacknowledged inputs.
     const me = view.bodies.find((b) => b.id === this.session.localId);
     this.localAlive = !!me?.alive;
-    if (me && me.alive && MOVE_PHASES.has(view.phase)) {
+    // Includes the short lock grace window: the server may still be applying our last in-flight
+    // inputs, so keep replaying them on top of its position instead of snapping back to it.
+    const elapsed = view.phaseDuration - view.phaseRemaining;
+    if (me && me.alive && humanMayMove(view.phase, elapsed)) {
       this.pending = this.pending.filter((i) => i.seq > view.ackSeq);
       let p: Vec2 = { ...me.pos };
       for (const input of this.pending) p = stepMovement(p, input, STEP, this.world.arena);
@@ -270,7 +274,9 @@ export class GameController {
     // Pose every subject.
     for (const sv of this.views.values()) {
       if (sv.ragdoll) continue;
-      if (sv.id === localId && this.localAlive && AIM_PHASES.has(view.phase)) {
+      // The local subject is always drawn at its predicted/confirmed position. Falling back to
+      // the interpolated server pose (100 ms behind) at the lock made it jump backwards.
+      if (sv.id === localId && this.localAlive) {
         const r = this.renderedLocal();
         if (r) sv.setPose(r, this.aimYaw, MOVE_PHASES.has(view.phase) && this.pending.length > 0 && this.isMovingInput());
       } else {

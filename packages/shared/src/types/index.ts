@@ -1,5 +1,5 @@
 import type { Vec2 } from '../math/vec';
-import type { SkinId } from '../constants/game';
+import { LOCK_GRACE_SECONDS, type SkinId } from '../constants/game';
 
 export type Phase =
   | 'WAITING'
@@ -21,6 +21,14 @@ export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'REPOSI
 export const MOVE_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'REPOSITION']);
 /** Aiming follows the same rule as moving: the lock freezes position and aim together. */
 export const AIM_PHASES: ReadonlySet<Phase> = MOVE_PHASES;
+
+/**
+ * Whether movement / aim are allowed right now, for a human subject. This is the MOVE_PHASES
+ * rule plus the short lock grace window at the start of the locked countdown. The server and
+ * the client's prediction both use it, so they always agree.
+ */
+export const humanMayMove = (phase: Phase, phaseElapsed: number): boolean =>
+  MOVE_PHASES.has(phase) || (phase === 'COUNTDOWN' && phaseElapsed < LOCK_GRACE_SECONDS);
 
 export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export type GameModeId = 'FFA' | 'TEAMS';
