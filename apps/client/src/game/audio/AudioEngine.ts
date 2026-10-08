@@ -127,33 +127,23 @@ export class AudioEngine {
     this.noiseBurst(out, t + 0.03, 1.4, { type: 'lowpass', freq: 180 }, 1.1, 0.03);
   }
 
-  /** Play one of several recorded takes, slightly varied, through the room reverb. */
-  private playSample(takes: AudioBuffer[], pan: number, distance: number, delay: number, loudness: number): void {
+  /** Play one of the recorded takes as-is: full, dry and loud (it is the moment of the round). */
+  private playSample(takes: AudioBuffer[], pan: number, _distance: number, delay: number, loudness: number): void {
     const ctx = this.ctx as AudioContext;
     const buf = takes[Math.floor(Math.random() * takes.length)];
     if (!buf) return;
     const t = ctx.currentTime + delay;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = 0.95 + Math.random() * 0.1;
+    // Tiny variation only: bigger pitch shifts make a real recording sound fake.
+    src.playbackRate.value = 0.98 + Math.random() * 0.04;
     const gain = ctx.createGain();
-    gain.gain.value = Math.max(0.45, 1 - distance / 60) * loudness * 1.1;
+    gain.gain.value = 1.15 * loudness;
     const panner = ctx.createStereoPanner();
-    panner.pan.value = Math.max(-1, Math.min(1, pan));
-    src.connect(gain).connect(panner);
-    // The recordings already carry their own outdoor/range tail, so no extra reverb here.
-    panner.connect(this.sfx);
+    // Mostly centred: the shot should hit both ears hard.
+    panner.pan.value = Math.max(-1, Math.min(1, pan)) * 0.4;
+    src.connect(gain).connect(panner).connect(this.sfx);
     src.start(t);
-    // A little extra low end so the shot thumps on laptop speakers too.
-    const sub = ctx.createOscillator();
-    sub.frequency.setValueAtTime(90, t);
-    sub.frequency.exponentialRampToValueAtTime(35, t + 0.3);
-    const subGain = ctx.createGain();
-    subGain.gain.setValueAtTime(0.45 * gain.gain.value, t);
-    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-    sub.connect(subGain).connect(panner);
-    sub.start(t);
-    sub.stop(t + 0.4);
   }
 
   private async loadSamples(): Promise<void> {

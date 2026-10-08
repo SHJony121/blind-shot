@@ -39,5 +39,7 @@ export interface GameMode {
   canAim(): boolean;
   /** Called after a player was removed from play (disconnect, kick). */
   onPlayerRemoved(id: string): void;
+  /** Called when a subject steps off a floating platform. */
+  onPlayerFell(id: string): void;
   isFinished(): boolean;
 }

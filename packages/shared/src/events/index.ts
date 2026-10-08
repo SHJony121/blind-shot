@@ -7,6 +7,7 @@ import type {
   RoomState,
   RoundEndedEvent,
   ShotFiredEvent,
+  PlayerFellEvent,
 } from '../types';
 
 export interface HelloPayload {
@@ -45,6 +46,7 @@ export interface ServerToClientEvents {
   snapshot: (view: MatchView) => void;
   phaseChanged: (e: PhaseChangedEvent) => void;
   shotFired: (e: ShotFiredEvent) => void;
+  playerFell: (e: PlayerFellEvent) => void;
   roundEnded: (e: RoundEndedEvent) => void;
   matchEnded: (e: MatchEndedEvent) => void;
   notice: (message: string) => void;

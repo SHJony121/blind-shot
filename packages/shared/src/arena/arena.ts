@@ -37,6 +37,8 @@ export interface ArenaDef {
   halfX: number;
   halfZ: number;
   wallHeight: number;
+  /** Open platform floating in the sky: no walls, and walking off the edge is a fatal fall. */
+  floating: boolean;
   obstacles: Obstacle[];
 }
 
@@ -118,7 +120,8 @@ export function castRay(
   targets: readonly RayTarget[],
   maxRange = MAX_SHOT_RANGE,
 ): RayHit {
-  const wall = rayWalls(arena, origin, dir);
+  // Floating platforms have no walls: bullets fly on into the sky.
+  const wall = arena.floating ? { t: Infinity, normal: { x: 0, z: 0 } } : rayWalls(arena, origin, dir);
   let best = Math.min(maxRange, wall.t);
   let surface: RayHit['surface'] = best < maxRange ? 'WALL' : 'NONE';
   let normal = wall.normal;
@@ -163,7 +166,7 @@ export function castRay(
 }
 
 /** Push a circle of `radius` at `p` out of every obstacle and back inside the walls. */
-export function resolveCollisions(arena: ArenaDef, p: Vec2, radius: number): Vec2 {
+export function resolveCollisions(arena: ArenaDef, p: Vec2, radius: number, clampToBounds = true): Vec2 {
   let { x, z } = p;
   for (const ob of arena.obstacles) {
     if (ob.kind === 'circle') {
@@ -195,8 +198,10 @@ export function resolveCollisions(arena: ArenaDef, p: Vec2, radius: number): Vec
       }
     }
   }
-  x = Math.max(-arena.halfX + radius, Math.min(arena.halfX - radius, x));
-  z = Math.max(-arena.halfZ + radius, Math.min(arena.halfZ - radius, z));
+  if (clampToBounds) {
+    x = Math.max(-arena.halfX + radius, Math.min(arena.halfX - radius, x));
+    z = Math.max(-arena.halfZ + radius, Math.min(arena.halfZ - radius, z));
+  }
   return { x, z };
 }
 
@@ -248,94 +253,52 @@ export function randomSpawns(arena: ArenaDef, teams: readonly TeamId[], rng: Rng
   return out;
 }
 
-const circle = (x: number, z: number, radius: number, height = 3): CircleObstacle => ({
-  kind: 'circle',
-  pos: { x, z },
-  radius,
-  height,
-});
-const box = (x: number, z: number, halfX: number, halfZ: number, height = 2.2): BoxObstacle => ({
-  kind: 'box',
-  pos: { x, z },
-  halfX,
-  halfZ,
-  height,
-});
-
-/** Big open square test floor with four pillars and two low blocks for cover. */
+/** Big open square test floor inside the industrial chamber. */
 export const TEST_CHAMBER_01: ArenaDef = {
   id: 'TEST_CHAMBER_01',
   name: 'TEST CHAMBER 01',
   theme: 'chamber',
+  floating: false,
   halfX: 14,
   halfZ: 14,
   wallHeight: 9,
-  obstacles: [
-    circle(-6, -6, 0.75),
-    circle(6, -6, 0.75),
-    circle(-6, 6, 0.75),
-    circle(6, 6, 0.75),
-    box(0, -9.5, 1.6, 0.6, 1.6),
-    box(0, 9.5, 1.6, 0.6, 1.6),
-  ],
+  obstacles: [],
 };
 
-/** Long factory hall with crates and machinery to hide behind. */
+/** Long, open factory hall. */
 export const FACTORY_FLOOR: ArenaDef = {
   id: 'FACTORY_FLOOR',
   name: 'FACTORY FLOOR',
   theme: 'factory',
+  floating: false,
   halfX: 18,
   halfZ: 13,
   wallHeight: 10,
-  obstacles: [
-    box(-9, 5, 1.2, 1.2),
-    box(-6.6, 5, 1.0, 1.0, 1.6),
-    box(8, -5, 1.5, 1.1),
-    box(0, 0, 3.6, 0.7, 1.3),
-    box(-4, -8, 1.1, 1.1),
-    box(11, 7, 1.0, 1.6),
-    box(4, 8.5, 0.9, 0.9, 1.6),
-    circle(-13, -3, 0.8, 6),
-    circle(13.5, -1, 0.8, 6),
-  ],
+  obstacles: [],
 };
 
-/** Square reactor cooling room: big round tanks and a central core. */
+/** Square tiled reactor cooling room. */
 export const COOLING_ROOM: ArenaDef = {
   id: 'COOLING_ROOM',
   name: 'COOLING ROOM',
   theme: 'cooling',
+  floating: false,
   halfX: 15,
   halfZ: 15,
   wallHeight: 10,
-  obstacles: [
-    circle(0, 0, 2.1, 5),
-    circle(-8.5, -8.5, 1.5, 4),
-    circle(8.5, 8.5, 1.5, 4),
-    circle(-8.5, 8.5, 1.1, 3.5),
-    circle(8.5, -8.5, 1.1, 3.5),
-    box(-11.5, 0, 0.6, 2.2, 1.4),
-    box(11.5, 0, 0.6, 2.2, 1.4),
-  ],
+  obstacles: [],
 };
 
-/** Bright, clean white test floor under an open sky: the classic look. */
+/** Bright, clean white platform floating high in the sky. Step off the edge and you fall. */
 export const WHITE_ROOM: ArenaDef = {
   id: 'WHITE_ROOM',
   name: 'WHITE ROOM',
   theme: 'clean',
+  floating: true,
   halfX: 16,
   halfZ: 16,
   wallHeight: 2.2,
-  obstacles: [
-    box(-7, -4, 1.0, 1.0, 1.8),
-    box(7, 4, 1.0, 1.0, 1.8),
-    box(-4, 11, 2.2, 0.5, 1.6),
-    box(4, -11, 2.2, 0.5, 1.6),
-    circle(9, -9, 0.7, 2.6),
-    circle(-9, 9, 0.7, 2.6),
-  ],
+  obstacles: [],
 };
 
 export const ARENAS: Record<MapId, ArenaDef> = {
@@ -364,3 +327,7 @@ export function scaleArena(def: ArenaDef, scale: number): ArenaDef {
     });
   return { ...def, halfX, halfZ, obstacles };
 }
+
+/** True when a subject standing at `p` has stepped off a floating platform. */
+export const isOffEdge = (arena: ArenaDef, p: Vec2): boolean =>
+  arena.floating && (Math.abs(p.x) > arena.halfX || Math.abs(p.z) > arena.halfZ);

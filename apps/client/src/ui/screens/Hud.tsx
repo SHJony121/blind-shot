@@ -101,8 +101,10 @@ export function Hud({ actions }: { actions: HudActions }) {
 
       {h.spectating && !h.roundResult && !h.matchResult ? <div className="spectating">ELIMINATED · SPECTATING</div> : null}
 
-      {(h.phase === 'FREEZE' || h.phase === 'SHOOTING' || h.phase === 'REVEAL') && !h.matchResult ? (
-        <div className="inspect-hint">SCROLL = ZOOM · DRAG = LOOK AROUND</div>
+      {!h.matchResult && !h.paused ? (
+        <div className="inspect-hint">
+          SCROLL ZOOM · RIGHT-DRAG LOOK{h.phase === 'FREEZE' || h.phase === 'SHOOTING' || h.phase === 'REVEAL' ? ' (LEFT-DRAG TOO)' : ''} · C RESET VIEW
+        </div>
       ) : null}
 
       {h.hintsVisible && (h.phase === 'VISIBLE' || h.phase === 'SPAWN') && h.round === 1 ? (

@@ -139,6 +139,14 @@ export interface ShotFiredEvent {
   simultaneous: boolean;
 }
 
+/** A subject walked off a floating platform. `pos` is null while enemies are hidden (no leak). */
+export interface PlayerFellEvent {
+  id: string;
+  round: number;
+  shot: number;
+  pos: Vec2 | null;
+}
+
 export interface RoundEndedEvent {
   round: number;
   draw: boolean;
@@ -168,6 +176,7 @@ export interface PhaseChangedEvent {
 export type MatchEvent =
   | { type: 'phaseChanged'; data: PhaseChangedEvent }
   | { type: 'shotFired'; data: ShotFiredEvent }
+  | { type: 'playerFell'; data: PlayerFellEvent }
   | { type: 'roundEnded'; data: RoundEndedEvent }
   | { type: 'matchEnded'; data: MatchEndedEvent };
 

@@ -133,6 +133,8 @@ export class BotBrain {
       this.yaw = turnToward(this.yaw, desired, this.profile.turnSpeed * dt);
     }
 
+    // Keep the goal on the (possibly shrunken) floor: bots never walk off a floating edge.
+    this.moveGoal = resolveCollisions(this.arenaOf(), this.moveGoal, PLAYER_HIT_RADIUS * 2);
     const toGoal = sub(this.moveGoal, me.pos);
     const far = Math.hypot(toGoal.x, toGoal.z) > 0.15;
     const move = far ? normalize(toGoal) : { x: 0, z: 0 };

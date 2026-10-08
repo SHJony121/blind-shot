@@ -1,8 +1,9 @@
 gunshot-1.wav, gunshot-2.wav, gunshot-3.wav
 
-Trimmed single shots (1911 takes A_42P and A_34P, Smith & Wesson 642 take V_22P)
-from "The Free Firearm Sound Library" (Prepared SFX Library), released under
+Single shots (1911 takes A_34P and A_42P, Smith & Wesson 642 take V_22P) from
+"The Free Firearm Sound Library" (Prepared SFX Library), released under
 CC0 1.0 Universal (public domain dedication), no rights reserved.
 Source: https://opengameart.org/content/the-free-firearm-sound-library
 Edits: one shot cut from each take, mixed to mono, resampled to 44.1 kHz 16-bit,
+low-end boost below ~180 Hz, soft-clip limiting for a denser "game" shot,
 normalised, 0.35 s fade-out.

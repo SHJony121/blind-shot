@@ -155,7 +155,7 @@ export class ArenaView {
   applyEnvironment(scene: THREE.Scene): void {
     const sky = this.style.bright ? '#bfe0f5' : '#0d1114';
     scene.background = new THREE.Color(sky);
-    scene.fog = this.style.bright ? new THREE.Fog(sky, 60, 140) : new THREE.Fog(sky, 30, 70);
+    scene.fog = this.style.bright ? new THREE.Fog(sky, 70, 170) : new THREE.Fog(sky, 30, 70);
   }
 
   // --- Lighting control ------------------------------------------------------
@@ -321,15 +321,19 @@ export class ArenaView {
       this.group.add(emblem);
     }
 
+    if (this.arena.floating) {
+      // A thick slab hanging in the sky: there is nothing below the edge.
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, 2.4, hz * 2), toon('#d9dee3'));
+      slab.position.y = -1.22;
+      slab.receiveShadow = true;
+      const under = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 - 1.5, 1.2, hz * 2 - 1.5), toon('#aeb6be'));
+      under.position.y = -2.9;
+      this.edge.add(slab, under);
+      return;
+    }
+
     // Dark void around the room (visible through the open near side).
-    const outside = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 400),
-      this.style.bright
-        ? // Out of bounds: the same checker, greyed out, so the shrinking edge is easy to see.
-          new THREE.MeshStandardMaterial({ map: floorTexture('clean', 100, 100), color: '#aab4bd', roughness: 1 })
-        : new THREE.MeshBasicMaterial({ color: '#07090b' }),
-    );
-    outside.receiveShadow = this.style.bright;
+    const outside = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: '#07090b' }));
     outside.rotation.x = -Math.PI / 2;
     outside.position.y = -0.05;
     this.group.add(outside);
@@ -467,20 +471,20 @@ export class ArenaView {
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     this.displays.push({ canvas, tex });
+    // A floating scoreboard beyond the far edge.
     const sign = new THREE.Group();
-    sign.position.set(0, 7, hz + 3);
+    sign.position.set(0, 8, hz + 6);
     sign.rotation.y = Math.PI;
     const bezel = new THREE.Mesh(new THREE.BoxGeometry(9.4, 4.9, 0.4), toon('#20262b'));
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(9, 4.5), new THREE.MeshBasicMaterial({ map: tex }));
     screen.position.z = 0.21;
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 7, 10), toon('#c9d1d8'));
-    post.position.y = -4.5;
-    sign.add(bezel, screen, post);
+    sign.add(bezel, screen);
     this.group.add(sign);
     this.setDisplay(this.arena.name, 'SUBJECTS STAND BY');
     const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, fog: false });
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2;
+    // Clouds all around and far below: the platform is high in the sky.
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2 + Math.random() * 0.3;
       const cloud = new THREE.Group();
       for (let k = 0; k < 4; k++) {
         const puff = new THREE.Mesh(new THREE.SphereGeometry(3 + Math.random() * 2, 12, 8), cloudMat);
@@ -488,7 +492,9 @@ export class ArenaView {
         puff.scale.y = 0.55;
         cloud.add(puff);
       }
-      cloud.position.set(Math.sin(a) * 85, 14 + Math.random() * 10, Math.cos(a) * 85);
+      const below = i % 2 === 1;
+      const r = below ? 30 + Math.random() * 40 : 80 + Math.random() * 15;
+      cloud.position.set(Math.sin(a) * r, below ? -35 - Math.random() * 25 : 10 + Math.random() * 14, Math.cos(a) * r);
       cloud.lookAt(0, cloud.position.y, 0);
       this.group.add(cloud);
     }

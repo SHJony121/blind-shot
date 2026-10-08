@@ -1,4 +1,4 @@
-import { getArena, scaleArena, type ArenaDef } from '../arena/arena';
+import { getArena, isOffEdge, scaleArena, type ArenaDef } from '../arena/arena';
 import { BotBrain } from '../bots/BotBrain';
 import { SKINS, SUBJECT_COLORS, isSkin } from '../constants/game';
 import { emptyStats } from '../gameState/config';
@@ -148,6 +148,10 @@ export class MatchSimulation {
         p.moving = Math.hypot(next.x - p.pos.x, next.z - p.pos.z) > 1e-4;
         p.pos = next;
       }
+    }
+    // Anyone who walked off a floating platform falls to their doom.
+    for (const p of this.players.values()) {
+      if (p.alive && p.inRound && isOffEdge(this.arena, p.pos)) this.mode.onPlayerFell(p.id);
     }
 
     this.mode.update(dt);

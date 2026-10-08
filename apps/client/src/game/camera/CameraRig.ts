@@ -29,7 +29,6 @@ export class CameraRig {
   sway = 0.5;
   private readonly pos = new THREE.Vector3(0, 9, -16);
   private readonly look = new THREE.Vector3(0, 1, 0);
-  private orbit = 0;
   private menuT = 0;
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
@@ -64,20 +63,20 @@ export class CameraRig {
     // Match starting but no subject yet: hold still and keep the pending cut.
     if (this._mode === 'player' && !subject) return;
     if (this.mode === 'player' && subject) {
-      // High, behind (-Z side), following the subject part of the way so the whole floor
-      // stays readable: you always see where everyone is and where they aim.
-      const fx = subject.x * 0.65;
-      const fz = subject.z * 0.45;
-      const height = 7 + bz * 1.0;
-      tmpPos.set(fx, height, fz - bz * 0.75 - 2);
-      tmpLook.set(fx, 0, fz - bz * 0.05);
+      // Overview of the whole floor that only leans a little toward your subject, so walking
+      // to one side never hides the other. Zoom / orbit (applyInspect) are always free.
+      const fx = subject.x * 0.3;
+      const fz = subject.z * 0.3;
+      const height = 6 + bz * 1.05;
+      tmpPos.set(fx, height, fz - bz * 1.0 - 3);
+      tmpLook.set(fx, 0, fz);
       this.applyInspect(dt);
       this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 5);
     } else if (this.mode === 'spectate') {
-      this.orbit += dt * 0.05;
-      const r = Math.max(bx, bz) * 0.35;
-      tmpPos.set(Math.sin(this.orbit) * r, 17 + bz * 0.7, -bz - 4 + Math.cos(this.orbit) * r * 0.3);
-      tmpLook.set(0, 0, 1.5);
+      // Spectating: the same free overview of the whole floor, centred on the arena.
+      tmpPos.set(0, 6 + bz * 1.15, -bz * 1.05 - 3);
+      tmpLook.set(0, 0, 0);
+      void bx;
       this.applyInspect(dt);
       this.damp(tmpPos, tmpLook, dt, this.inspect.enabled ? 9 : 2);
     } else {
@@ -110,7 +109,8 @@ export class CameraRig {
     const horiz = Math.hypot(off.x, off.z);
     const elev = Math.atan2(off.y, horiz) + this.pitchS;
     const len = off.length() * this.zoomS;
-    const clampedElev = Math.max(0.2, Math.min(1.45, elev));
+    // Low enough to look out over the edge at the sky, high enough for a top-down view.
+    const clampedElev = Math.max(0.05, Math.min(1.5, elev));
     const dirXZ = horiz > 1e-6 ? { x: off.x / horiz, z: off.z / horiz } : { x: 0, z: -1 };
     tmpPos.set(
       tmpLook.x + dirXZ.x * Math.cos(clampedElev) * len,

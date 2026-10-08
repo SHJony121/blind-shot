@@ -44,21 +44,42 @@ test('result does not depend on shooter order', () => {
   assert(d1 === d2, `order changed result: ${d1} vs ${d2}`);
 });
 
-test('pillars stop bullets', () => {
-  const pillar = TEST_CHAMBER_01.obstacles.find((o) => o.kind === 'circle');
-  if (!pillar) throw new Error('arena has pillars');
-  const from = { x: 0, z: 0 };
-  const behind = { x: pillar.pos.x * 2, z: pillar.pos.z * 2 };
-  const yaw = dirToYaw(sub(behind, from));
+test('obstacles stop bullets', () => {
+  const arena = {
+    ...TEST_CHAMBER_01,
+    obstacles: [{ kind: 'circle' as const, pos: { x: 0, z: 0 }, radius: 0.8, height: 3 }],
+  };
   const shots = computeShots(
-    TEST_CHAMBER_01,
+    arena,
     [
-      { id: 'a', team: 0, pos: from, yaw },
-      { id: 'b', team: 0, pos: behind, yaw: 0 },
+      { id: 'a', team: 0, pos: { x: 0, z: -5 }, yaw: 0 },
+      { id: 'b', team: 0, pos: { x: 0, z: 5 }, yaw: 0 },
     ],
     false,
   );
   assert(shots[0]?.hitSurface === 'PILLAR', `expected PILLAR, got ${shots[0]?.hitSurface}`);
+});
+
+test('walking off a floating platform eliminates the subject', () => {
+  const sim = new MatchSimulation(
+    { ...DEFAULT_MATCH_CONFIG, mapId: 'WHITE_ROOM', botDifficulty: 'EASY' },
+    [
+      { id: 'h', name: 'Human', isBot: false },
+      { id: 'b1', name: 'Bot1', isBot: true },
+      { id: 'b2', name: 'Bot2', isBot: true },
+    ],
+    5,
+  );
+  sim.start();
+  while (sim.phase !== 'VISIBLE') sim.tick(1 / 30);
+  const me = sim.players.get('h')!;
+  let fell = false;
+  for (let seq = 1; seq < 30 * 20 && me.alive; seq++) {
+    sim.queueInput('h', { seq, moveX: 1, moveZ: 0, sprint: true, yaw: 0 });
+    sim.tick(1 / 30);
+    for (const e of sim.drainEvents()) if (e.type === 'playerFell' && e.data.id === 'h') fell = true;
+  }
+  assert(!me.alive && fell, 'subject should fall off the edge');
 });
 
 test('friendly fire off lets bullets pass through teammates', () => {

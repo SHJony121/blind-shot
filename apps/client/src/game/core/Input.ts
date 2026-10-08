@@ -26,7 +26,9 @@ export class Input {
   private readonly pressListeners = new Set<Listener>();
   private readonly releaseListeners = new Set<Listener>();
   private enabled = true;
-  private dragging = false;
+  private dragButton = -1;
+  /** Left-button drag orbits the camera only when aiming is locked (it would fight the cursor otherwise). */
+  leftDragOrbits = false;
 
   constructor(private readonly element: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
@@ -53,11 +55,11 @@ export class Input {
   };
 
   private onPointerDown = (e: PointerEvent): void => {
-    if (e.button === 0 || e.button === 2) this.dragging = true;
+    this.dragButton = e.button;
   };
 
   private onPointerUp = (): void => {
-    this.dragging = false;
+    this.dragButton = -1;
   };
 
   setEnabled(enabled: boolean): void {
@@ -126,7 +128,8 @@ export class Input {
     this.state.pointerX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
     this.state.pointerY = -(((e.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
     if (document.pointerLockElement === this.element) this.state.turnDelta += e.movementX;
-    else if (this.dragging) {
+    // Right / middle drag always orbits; left drag only when aims are locked.
+    else if (this.dragButton === 1 || this.dragButton === 2 || (this.dragButton === 0 && this.leftDragOrbits)) {
       this.state.dragX += e.movementX;
       this.state.dragY += e.movementY;
     }

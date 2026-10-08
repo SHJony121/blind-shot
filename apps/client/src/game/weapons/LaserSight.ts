@@ -79,7 +79,8 @@ export class LaserSight {
 
     const origin = muzzleOrigin(pos, yaw);
     const dir = yawToDir(yaw);
-    const hit = castRay(arena, origin, dir, targets);
+    // Capped so a beam running off a floating edge does not sweep past the camera.
+    const hit = castRay(arena, origin, dir, targets, 36);
     const len = Math.max(0.01, hit.distance);
     this.pulse += dt * 9;
     const flicker = 0.85 + Math.sin(this.pulse) * 0.08 + Math.random() * 0.07;

@@ -12,7 +12,7 @@ import {
 } from '../../constants/game';
 import { collectEliminations, computeShots, fireOne, type ShooterSnapshot } from '../../sim/shotResolution';
 import { toPlayerInfo, type SimPlayer } from '../../sim/SimPlayer';
-import { AIM_PHASES, MOVE_PHASES, type Phase, type ShotResult, type TeamId } from '../../types';
+import { AIM_PHASES, HIDDEN_PHASES, MOVE_PHASES, type Phase, type ShotResult, type TeamId } from '../../types';
 import type { GameMode, ModeContext } from '../GameMode';
 
 /** Phases where a disconnect can end the round early. */
@@ -142,6 +142,17 @@ export class BlindShotMode implements GameMode {
   onPlayerRemoved(id: string): void {
     const p = this.ctx.players.get(id);
     if (p) p.alive = false;
+    if (INTERRUPTIBLE.has(this.phase) && this.aliveSides().length <= 1) this.endRound();
+  }
+
+  onPlayerFell(id: string): void {
+    const p = this.ctx.players.get(id);
+    if (!p || !p.alive) return;
+    this.eliminate(id);
+    this.ctx.emit({
+      type: 'playerFell',
+      data: { id, round: this.round, shot: this.shot, pos: HIDDEN_PHASES.has(this.phase) ? null : { ...p.pos } },
+    });
     if (INTERRUPTIBLE.has(this.phase) && this.aliveSides().length <= 1) this.endRound();
   }
 

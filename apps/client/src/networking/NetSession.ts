@@ -27,6 +27,7 @@ export class NetSession implements GameSession {
       snapshot: (v: MatchView) => queue((l) => l.onView(v)),
       phaseChanged: ev('phaseChanged'),
       shotFired: ev('shotFired'),
+      playerFell: ev('playerFell'),
       roundEnded: ev('roundEnded'),
       matchEnded: ev('matchEnded'),
     };

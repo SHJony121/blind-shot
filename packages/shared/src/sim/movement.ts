@@ -20,7 +20,7 @@ export function sanitizeInput(raw: unknown): PlayerInput | null {
 
 /**
  * Deterministic arcade movement shared by the authority and client-side prediction.
- * Subjects can go anywhere on the floor; obstacles and walls block them.
+ * Subjects can go anywhere on the floor; obstacles and walls block them (floating maps have no walls).
  */
 export function stepMovement(
   pos: Vec2,
@@ -30,5 +30,6 @@ export function stepMovement(
 ): Vec2 {
   const speed = input.sprint ? SPRINT_SPEED : WALK_SPEED;
   const next = { x: pos.x + input.moveX * speed * dt, z: pos.z + input.moveZ * speed * dt };
-  return resolveCollisions(arena, next, PLAYER_HIT_RADIUS);
+  // On floating platforms nothing stops you at the edge: step past it and you fall.
+  return resolveCollisions(arena, next, PLAYER_HIT_RADIUS, !arena.floating);
 }

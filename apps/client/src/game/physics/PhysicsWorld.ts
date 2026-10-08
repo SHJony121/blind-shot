@@ -58,7 +58,9 @@ export class PhysicsWorld {
     const { halfX: hx, halfZ: hz, wallHeight: h } = arena;
     // Floor (top surface at y = 0). Much bigger than the play area, so bodies left outside
     // a shrunken boundary still have ground to lie on.
-    fixed(R.ColliderDesc.cuboid(120, 0.5, 120), 0, -0.5, 0);
+    // Floating maps: the floor ends at the edge, so bodies can tumble off into the sky.
+    if (arena.floating) fixed(R.ColliderDesc.cuboid(hx, 1.2, hz), 0, -1.2, 0);
+    else fixed(R.ColliderDesc.cuboid(120, 0.5, 120), 0, -0.5, 0);
     // Open maps have no walls: nothing to collide with at the boundary.
     if (arena.theme !== 'clean') {
       // Walls: ragdolls bounce off them.

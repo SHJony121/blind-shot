@@ -89,6 +89,7 @@ export class GameController {
       world.input.onPress((code) => {
         if (code === 'Tab') hudStore.set({ showScoreboard: true });
         if (code === 'Escape') this.togglePause();
+        if (code === 'KeyC') Object.assign(this.world.cameraRig.inspect, { zoom: 1, yaw: 0, pitch: 0, focus: null });
       }),
       world.input.onRelease((code) => {
         if (code === 'Tab') hudStore.set({ showScoreboard: false });
@@ -124,6 +125,8 @@ export class GameController {
     this.world.input.exitPointerLock();
     this.world.input.setEnabled(true);
     this.world.cameraRig.mode = 'menu';
+    Object.assign(this.world.cameraRig.inspect, { enabled: false, zoom: 1, yaw: 0, pitch: 0, focus: null });
+    this.world.input.leftDragOrbits = false;
     this.world.cameraTarget = () => ({ subject: null, aim: null });
     this.world.setArena('WHITE_ROOM');
     this.world.chamber.setMood('menu');
@@ -219,6 +222,9 @@ export class GameController {
         this.presenter.onShot(e.data);
         this.playShot(e.data);
         break;
+      case 'playerFell':
+        this.playFall(e.data.id, e.data.pos);
+        break;
       case 'roundEnded': {
         hudStore.set({ roundResult: e.data, roster: e.data.roster });
         const won = e.data.winnerIds.includes(this.session.localId);
@@ -294,18 +300,15 @@ export class GameController {
     }
   }
 
-  /** After the freeze: scroll to zoom toward the cursor, drag to orbit. */
+  /** Free camera at any time: scroll to zoom toward the cursor, right-drag to orbit (left-drag too when aims are locked). */
   private updateInspect(view: MatchView): void {
     const rig = this.world.cameraRig;
     const cam = this.world.input.consumeCamera();
-    const allowed = (view.phase === 'FREEZE' || view.phase === 'SHOOTING' || view.phase === 'REVEAL') && !this.paused;
-    if (!allowed) {
-      if (rig.inspect.enabled) Object.assign(rig.inspect, { enabled: false, zoom: 1, yaw: 0, pitch: 0, focus: null });
-      return;
-    }
+    this.world.input.leftDragOrbits = !this.localAlive || !AIM_PHASES.has(view.phase);
+    if (this.paused) return;
     rig.inspect.enabled = true;
     if (cam.wheel !== 0) {
-      rig.inspect.zoom = Math.max(0.22, Math.min(1.5, rig.inspect.zoom * Math.pow(1.15, cam.wheel)));
+      rig.inspect.zoom = Math.max(0.2, Math.min(2.2, rig.inspect.zoom * Math.pow(1.15, cam.wheel)));
       if (cam.wheel < 0) {
         ndc.set(this.world.input.state.pointerX, this.world.input.state.pointerY);
         raycaster.setFromCamera(ndc, this.world.engine.camera);
@@ -314,7 +317,7 @@ export class GameController {
       }
     }
     rig.inspect.yaw -= cam.dragX * 0.006;
-    rig.inspect.pitch = Math.max(-0.9, Math.min(0.6, rig.inspect.pitch + cam.dragY * 0.004));
+    rig.inspect.pitch = Math.max(-1.4, Math.min(0.7, rig.inspect.pitch + cam.dragY * 0.004));
   }
 
   private sampleLocalInput(dt: number, view: MatchView): void {
@@ -372,6 +375,28 @@ export class GameController {
 
   // ---------------------------------------------------------------------------
   // Shootout
+
+  /** Someone walked off a floating platform. Only shown when their position is public. */
+  private playFall(id: string, pos: Vec2 | null): void {
+    const localId = this.session.localId;
+    const sv = this.views.get(id);
+    const info = this.roster.get(id);
+    const who = id === localId ? 'YOU' : info ? `SUBJECT ${String(info.subject).padStart(2, '0')}` : 'A SUBJECT';
+    showBanner(`${who} FELL`, { size: 'md', tone: 'danger' });
+    audio.whoosh();
+    if (sv && pos && sv.presence === 'visible' && !sv.ragdoll) {
+      this.dying.add(id);
+      const out = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+      sv.kill(this.world.physics, out, 0.6);
+    }
+    if (id === localId) {
+      this.schedule(1.2, () => {
+        this.dying.delete(localId);
+        hudStore.set({ spectating: true });
+        this.world.cameraRig.mode = 'spectate';
+      });
+    }
+  }
 
   /** FREEZE: everyone is shown where they really are, frozen, with their locked aim. */
   private revealAll(): void {

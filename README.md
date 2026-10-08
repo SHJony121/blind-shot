@@ -38,14 +38,14 @@ Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultane
 
 | Map | Size | Layout |
 |---|---|---|
-| **White Room** (default) | 32 × 32 m | Bright white checker floor under an open sky, no walls (an orange boundary line), a few blocks and posts |
-| **Test Chamber 01** | 28 × 28 m | Open square floor with 4 pillars and 2 low blocks |
-| **Factory Floor** | 36 × 26 m | Long brick hall with crates and steel columns to hide behind |
-| **Cooling Room** | 30 × 30 m | Tiled reactor room with a central core and big coolant tanks |
+| **White Room** (default) | 32 × 32 m | Bright white checker platform floating high in the sky. No walls: walk off the orange edge and you fall to your death |
+| **Test Chamber 01** | 28 × 28 m | Open square floor inside the industrial chamber |
+| **Factory Floor** | 36 × 26 m | Long, open brick factory hall |
+| **Cooling Room** | 30 × 30 m | Open tiled reactor cooling room |
 
 A match is **first to 3 round wins** (best of 5). Hosts can change this.
 
-**The arena shrinks after every volley.** After each round of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in, and obstacles that no longer fit are removed. The size resets for the next match. On the White Room the edge is a bold orange line on the floor (no raised walls), with greyed-out floor beyond it.
+**The arena shrinks after every volley.** After each round of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in. The size resets for the next match. On the White Room the edge is a bold orange line, and beyond it there is only sky.
 
 ## Characters
 
@@ -59,7 +59,9 @@ Pick your look on the main menu (◀ ▶ under your name). It is saved in your b
 | WASD / arrows | Move anywhere on the floor (while visible and while hidden; never during the freeze) |
 | Shift | Sprint |
 | Tab | Scoreboard |
-| Mouse wheel / drag (after the freeze) | Zoom in toward the cursor and orbit the camera, to check whether a laser really lines up |
+| Mouse wheel | Zoom in (toward the cursor) and out, at any time |
+| Right-drag (also left-drag once aims are locked) | Look around freely: orbit the camera, tilt down low to see the sky |
+| C | Reset the camera view |
 | Esc | Pause / menu |
 
 You never press fire. Your shot goes off automatically after the freeze, so you get **one shot per volley**, and it goes wherever you were aiming when the freeze hit. In Settings you can switch to a pointer-locked "mouse turn" aim mode.
