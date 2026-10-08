@@ -271,9 +271,7 @@ canvas.world.in-game {
 }
 
 .menu-foot {
-  position: fixed;
-  left: 7vw;
-  bottom: 22px;
+  margin-top: 18px;
   font-size: 15px;
   letter-spacing: 0.18em;
   color: var(--muted);

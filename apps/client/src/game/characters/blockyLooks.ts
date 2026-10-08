@@ -132,7 +132,6 @@ export const BLOCKY_LOOKS: Partial<Record<SkinId, BlockyDef>> = {
   },
 };
 
-export const isBlocky = (skin: SkinId | undefined): boolean => !!skin && !!BLOCKY_LOOKS[skin];
 
 const geoCache = new Map<string, THREE.BufferGeometry>();
 function rbox(w: number, h: number, d: number, r = 0.04): THREE.BufferGeometry {

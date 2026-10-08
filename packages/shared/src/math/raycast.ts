@@ -17,12 +17,3 @@ export function rayCircle(origin: Vec2, dir: Vec2, center: Vec2, radius: number)
   return -b - Math.sqrt(disc);
 }
 
-/** Distance to where a ray that starts *inside* a circle leaves it. */
-export function rayCircleExit(origin: Vec2, dir: Vec2, center: Vec2, radius: number): number {
-  const ox = origin.x - center.x;
-  const oz = origin.z - center.z;
-  const b = ox * dir.x + oz * dir.z;
-  const c = ox * ox + oz * oz - radius * radius;
-  const disc = Math.max(0, b * b - c);
-  return -b + Math.sqrt(disc);
-}

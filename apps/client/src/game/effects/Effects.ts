@@ -9,7 +9,6 @@ interface Timed<T> {
   active: boolean;
 }
 
-const UP = new THREE.Vector3(0, 1, 0);
 const tmp = new THREE.Vector3();
 
 /**
@@ -269,4 +268,3 @@ export class Effects {
   }
 }
 
-export { UP };

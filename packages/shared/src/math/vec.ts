@@ -3,7 +3,6 @@ export interface Vec2 {
   z: number;
 }
 
-export const vec2 = (x = 0, z = 0): Vec2 => ({ x, z });
 export const add = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, z: a.z + b.z });
 export const sub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, z: a.z - b.z });
 export const scale = (a: Vec2, s: number): Vec2 => ({ x: a.x * s, z: a.z * s });
@@ -40,8 +39,3 @@ export const turnToward = (current: number, target: number, maxStep: number): nu
   return wrapAngle(current + Math.sign(d) * maxStep);
 };
 
-export const isFiniteVec = (v: unknown): v is Vec2 =>
-  typeof v === 'object' &&
-  v !== null &&
-  Number.isFinite((v as Vec2).x) &&
-  Number.isFinite((v as Vec2).z);

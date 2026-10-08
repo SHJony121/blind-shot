@@ -1,11 +1,9 @@
 /** Simulation / network rates. */
 export const SIM_TICK_RATE = 30;
 export const SNAPSHOT_RATE = 20;
-export const INPUT_SEND_RATE = 30;
 
 /** Player body + movement (metres, seconds). */
 export const PLAYER_HIT_RADIUS = 0.5;
-export const PLAYER_HEIGHT = 2.0;
 export const WALK_SPEED = 4.2;
 export const SPRINT_SPEED = 6.2;
 /** Keep subjects at least this far from walls when spawning. */

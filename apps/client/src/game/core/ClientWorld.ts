@@ -47,7 +47,6 @@ export class ClientWorld {
       const s = settingsStore.get();
       this.effects.shakeEnabled = s.screenShake;
       this.effects.reducedFlash = s.reducedFlash;
-      this.cameraRig.sway = s.cameraSway;
       this.engine.setShadows(s.shadows);
       audio.setVolumes({ master: s.masterVolume, sfx: s.soundOn ? s.sfxVolume : 0, music: s.musicOn ? s.musicVolume : 0 });
     };

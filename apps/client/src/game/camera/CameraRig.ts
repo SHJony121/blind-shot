@@ -32,7 +32,6 @@ export class CameraRig {
     if (m === 'menu' || this._mode === 'menu') this.snap = true;
     this._mode = m;
   }
-  sway = 0.5;
   private readonly pos = new THREE.Vector3(0, 9, -16);
   private readonly look = new THREE.Vector3(0, 1, 0);
   private menuT = 0;

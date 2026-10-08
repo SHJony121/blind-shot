@@ -16,14 +16,11 @@ export interface Settings {
   musicVolume: number;
   /** Turn speed in MOUSE_TURN aim mode. */
   mouseSensitivity: number;
-  /** How much the camera leans toward where you aim (0 = static). */
-  cameraSway: number;
   screenShake: boolean;
   reducedFlash: boolean;
   laserPalette: LaserPalette;
   aimMode: AimMode;
   shadows: boolean;
-  seenTutorial: boolean;
 }
 
 const KEY = 'blindshot.settings.v1';
@@ -37,13 +34,11 @@ const defaults = (): Settings => ({
   sfxVolume: 0.9,
   musicVolume: 0.5,
   mouseSensitivity: 1,
-  cameraSway: 0.5,
   screenShake: true,
   reducedFlash: false,
   laserPalette: 'SUBJECT',
   aimMode: 'CURSOR',
   shadows: true,
-  seenTutorial: false,
 });
 
 function load(): Settings {

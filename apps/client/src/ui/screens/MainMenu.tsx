@@ -106,7 +106,7 @@ export function MainMenu({ onQuickPlay }: { onQuickPlay: () => Promise<string | 
         ) : null}
         {net.store.get().status === 'connecting' ? <div className="label">CONNECTING…</div> : null}
       </div>
-      <div className="menu-foot">TEST CHAMBER 01 · ALL SUBJECTS ARE VOLUNTEERS · v0.1</div>
+      <div className="menu-foot">ALL SUBJECTS ARE VOLUNTEERS · v1.0</div>
     </div>
   );
 }

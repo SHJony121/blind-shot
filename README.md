@@ -1,240 +1,445 @@
+<div align="center">
+
 # BLIND SHOT
 
-> **Remember. Aim. Fire.** A 3D party game that runs straight in the browser: open the link, type a name, and play.
+**Remember. Aim. Fire.**
 
-Every subject in the test chamber holds a gun with a laser sight. For a few seconds you can see everyone and where they are aiming. Then the lights cut out and **every opponent disappears**: you can still run and aim, but you're playing from memory. A popup counts down `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1`, then everyone reappears and **freezes** with their aim locked. The shots go off **one by one**, the ragdolls fly, and the last subject standing wins.
+A 3D multiplayer party shooter that runs right in the browser.
+Memorise where everyone is, watch them vanish, move, lock in your aim, and find out who guessed right.
 
-| Visible: memorise | Hidden: they're gone | Freeze: aims locked | Shots, one by one |
-|---|---|---|---|
-| ![Visible phase](docs/screenshots/visible-phase.png) | ![Hidden phase](docs/screenshots/blind-phase.png) | ![Freeze](docs/screenshots/factory-freeze.png) | ![Shooting](docs/screenshots/shootout.png) |
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-0.170-000000?logo=threedotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-4-010101?logo=socketdotio&logoColor=white)
+![Rapier](https://img.shields.io/badge/Rapier-physics-E8A33D)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
+![Node](https://img.shields.io/badge/Node-20%2B-339933?logo=nodedotjs&logoColor=white)
 
-| Main menu | Teams: allies stay ghosted |
-|---|---|
-| ![Menu](docs/screenshots/menu.png) | ![Teams](docs/screenshots/teams-ghost.png) |
+<img src="docs/screenshots/visible.jpg" alt="Six subjects on the floating White Room, lasers showing who is aiming at whom" width="860">
 
-<!-- TODO: add a short gameplay GIF -->
+**Open the link, type a name, play.** No install, no launcher, no account.
+
+</div>
 
 ---
 
-## Core loop
+## Table of contents
 
-`SEE → AIM → MEMORIZE → DISAPPEAR → PREDICT → FREEZE → SHOOT (ONE BY ONE) → LAUGH → REPEAT`
+- [The game in 30 seconds](#the-game-in-30-seconds)
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [How a round works](#how-a-round-works)
+- [Architecture](#architecture)
+- [Netcode and the authoritative server](#netcode-and-the-authoritative-server)
+- [How shots are resolved](#how-shots-are-resolved)
+- [Bots](#bots)
+- [Rendering, physics and audio](#rendering-physics-and-audio)
+- [Project structure](#project-structure)
+- [Getting started](#getting-started)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Controls](#controls)
+- [Codebase at a glance](#codebase-at-a-glance)
+- [Roadmap](#roadmap)
+- [Credits](#credits)
 
-| Phase | What happens |
+---
+
+## The game in 30 seconds
+
+Every subject on the platform holds an oversized pistol with a **laser sight**.
+
+1. **See.** For a few seconds everyone is visible. Lasers show exactly who is aiming at whom.
+2. **Vanish.** The lights cut out and **every opponent disappears**. Hidden really means hidden: the client is not even sent their positions.
+3. **Move.** You get a short window to slip to a new spot while everyone is invisible.
+4. **Lock.** `LOCKED`: nobody can move or turn any more. `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1`.
+5. **Freeze and fire.** Everyone reappears, frozen with their aim locked. Then the shots go off **one by one**, in a random order. If you get hit before your turn, you never fire.
+6. **Laugh. Repeat.** The arena shrinks after every volley, and the last subject (or team) standing wins the round.
+
+The White Room floats high in the sky, so walking off the edge is a very public way to lose.
+
+---
+
+## Screenshots
+
+| Visible: memorise | Hidden: they're gone |
 |---|---|
-| **Round intro** | `ROUND 03` → `BLIND SHOT` → `MEMORIZE YOUR TARGET.` |
-| **Spawn** | Subjects drop in at random spots anywhere on the floor |
-| **Visible (5 s, up to 15 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
-| **Hide** | Warning tone, the lights flicker, and enemies vanish (`TARGETS HIDDEN`) |
-| **Hidden: move (5 s, 2–15 s)** | Enemies are truly gone. Everyone can still move to a new spot and aim. Popup: `MOVE · POSITIONS LOCK IN 5…1` |
-| **Hidden: locked countdown (5 s, up to 15 s)** | `LOCKED`: position and aim are frozen (only the camera view can still turn). Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
-| **Freeze (3 s)** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`). Scroll and drag to inspect the lasers |
-| **Shooting** | Subjects fire **one at a time** in a random order. A subject who gets shot before their turn never fires |
-| **Reveal** | `HIT!`, `MISS`, `EVERYBODY MISSED`, `2 SURVIVORS`… |
-| **Round results** | Volleys repeat until one subject (or team) is left. That side wins the round |
+| ![Visible phase](docs/screenshots/visible.jpg) | ![Hidden phase](docs/screenshots/hidden.jpg) |
+| **Freeze: aims locked** | **Shots, one by one** |
+| ![Freeze](docs/screenshots/freeze.jpg) | ![Shooting](docs/screenshots/shooting.jpg) |
+| **Free camera: zoom and orbit any time** | **Teams: allies stay ghosted** |
+| ![Free camera](docs/screenshots/free-camera.jpg) | ![Teams](docs/screenshots/teams.jpg) |
 
-Hosts can switch **Shots** to `ALL AT ONCE`, where every subject fires simultaneously and two subjects can kill each other.
-
-## Maps
-
-| Map | Size | Layout |
+| Test Chamber 01 | Factory Floor | Cooling Room |
 |---|---|---|
-| **White Room** (default) | 32 × 32 m | Bright white checker platform floating high in the sky. No walls: walk off the orange edge and you fall to your death |
-| **Test Chamber 01** | 28 × 28 m | Open square floor inside the industrial chamber |
-| **Factory Floor** | 36 × 26 m | Long, open brick factory hall |
-| **Cooling Room** | 30 × 30 m | Open tiled reactor cooling room |
+| ![Test Chamber 01](docs/screenshots/map-test-chamber.jpg) | ![Factory Floor](docs/screenshots/map-factory-floor.jpg) | ![Cooling Room](docs/screenshots/map-cooling-room.jpg) |
 
-A match is **first to 3 round wins** (best of 5). Hosts can change this.
-
-**The arena shrinks after every volley.** After each volley of shots the boundary slides in by 10% (down to 40% of the full size), with an `ARENA SHRINKING` callout. Anyone left outside is pushed back in. Every new round starts again at full size. On the White Room the edge is a bold orange line, and beyond it there is only sky.
-
-## Characters
-
-Pick your character on the main menu (◀ ▶ under your name). The choice is saved in your browser, and other players see it online. Bots pick at random. All eight are original designs with their own body shapes:
-
-| Character | Look |
+| Main menu | Characters |
 |---|---|
-| **Test Dummy** | The original round toon test subject in a jumpsuit, helmet and visor |
-| **The Blind** | Slim blocky figure, spiky white hair, black blindfold, dark outfit |
-| **Brawler** | Big chunky build, white headband, red shirt, green trousers |
-| **Agent** | Black suit, white shirt, red tie, shades, slicked hair |
-| **Punk** | Skinny, pink mohawk, open black jacket, jeans |
-| **Cowpoke** | Wide-brim hat, red bandana, rust shirt |
-| **Unit Bot** | Boxy metal robot with a screen face and an antenna |
-| **Astro** | Toon subject in a glass bubble helmet |
+| ![Menu](docs/screenshots/menu.jpg) | ![Characters](docs/screenshots/characters.jpg) |
 
-In TEAMS mode the blocky characters wear their team colour as their shirt.
+---
 
-## Controls (desktop)
+## Features
 
-| Input | Action |
-|---|---|
-| Mouse | Aim. Your subject turns to face the cursor |
-| WASD / arrows | Move anywhere on the floor (while visible and during the hidden move time; never during the locked countdown or the freeze) |
-| Shift | Sprint |
-| Tab | Scoreboard |
-| Mouse wheel | Zoom in (toward the cursor) and out, at any time |
-| Click + drag (any mouse button, any time) | Turn the view freely: orbit the camera, tilt down low to see the sky. Your aim holds still while you drag |
-| C | Reset the camera view |
-| Esc | Pause / menu |
+**Gameplay**
+- Memory-and-prediction shooting: see, vanish, reposition, lock, reveal, fire.
+- **One shot per volley.** Shots fire one by one in random order (default) or all at once (host option, with mutual kills).
+- **Shrinking arena:** the boundary closes in 10% after every volley and resets each round.
+- **Floating map:** the White Room has no walls, so stepping off the edge eliminates you.
+- Free-for-all and **teams** (2v2, 3v3, 4v4). Teammates stay ghosted while enemies are hidden, and friendly fire is optional.
+- Best-of-N matches with scoring, a per-round result card, and an end-of-match stats table (hits, accuracy, survival).
 
-You never press fire. Your shot goes off automatically after the freeze, so you get **one shot per volley**, and it goes wherever you were aiming when the freeze hit. In Settings you can switch to a pointer-locked "mouse turn" aim mode.
+**Play modes**
+- **Solo** against 1–7 bots (Easy, Normal, Hard). It runs entirely in the browser, with no server needed.
+- **Quick Play** joins an open public lobby, or creates one.
+- **Private rooms** use a 5-character code like `K7D4Q`. The host configures mode, players, rounds, phase timings, shot order, friendly fire, bots and map.
+- **Reconnect:** drop out and rejoin your seat within 30 s. If the host leaves, host passes to another player.
 
-## Modes
+**Presentation**
+- 4 maps: White Room (floating sky platform), Test Chamber 01, Factory Floor, Cooling Room.
+- 8 original characters with different silhouettes: Test Dummy, The Blind, Brawler, Agent, Punk, Cowpoke, Unit Bot and Astro.
+- Toon shading with ink outlines, physics ragdolls, muzzle flashes, tracers, smoke, sparks and screen shake.
+- A camera that always fits the whole arena. Zoom and orbit at any time to check whether a laser really lines up.
+- Real recorded gunshots (CC0) plus synthesised UI, ambience and stingers.
+- A minimal HUD that keeps the arena clear, and settings for audio, camera shake, flashes, colour-blind lasers and shadows.
 
-* **Solo:** you plus 1 to 7 bots (EASY / NORMAL / HARD). It runs entirely in your browser with no server needed.
-* **Quick Play:** joins an open public lobby, or creates one.
-* **Private Room:** creates a room with a 5-character code (e.g. `K7D4Q`) for friends to join. The host configures the mode, max players (2–8), rounds, visible and hidden phase length, shot order (one by one / all at once), friendly fire, bot fill and map.
-* **Free For All:** last subject alive wins the round. If everyone dies at once, the round is a draw.
-* **Teams (2v2 / 3v3 / 4v4):** blue vs orange. Teammates stay faintly visible (ghosted) while enemies are hidden. Friendly fire is off by default; with it off, bullets pass through teammates.
+---
 
-## Tech stack
+## How a round works
 
-| Layer | Choice |
-|---|---|
-| Language | TypeScript (strict) everywhere |
-| Rendering | Three.js (one engine), toon shading with inverted-hull ink outlines |
-| UI | React 18 overlay, Vite |
-| Physics | Rapier (`@dimforge/rapier3d-compat`), used only on the client for ragdolls and flying guns |
-| Gameplay hit tests | Analytic 2D raycasts in `packages/shared`, identical on client and server |
-| Networking | Socket.IO 4 with fully typed event maps |
-| Server | Node 20+, plain `http` + Socket.IO; it can also serve the built client |
-| Audio | Web Audio API, procedurally synthesised (no audio files) |
+The whole round is one explicit state machine in [`BlindShotMode`](packages/shared/src/modes/blindShot/BlindShotMode.ts). Nothing else changes the phase.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> ROUND_INTRO
+    ROUND_INTRO --> SPAWN: arena resets to full size
+    SPAWN --> VISIBLE
+    VISIBLE --> HIDE: move + aim, lasers on
+    HIDE --> REPOSITION: lights flicker, enemies vanish
+    REPOSITION --> COUNTDOWN: move + aim while hidden
+    COUNTDOWN --> FREEZE: LOCKED, no move, no aim
+    FREEZE --> SHOOTING: everyone revealed, aims locked
+    SHOOTING --> REVEAL: one by one (or all at once)
+    REVEAL --> VISIBLE: more than one side alive<br/>(arena shrinks 10%)
+    REVEAL --> ROUND_RESULTS: one or zero sides alive
+    ROUND_RESULTS --> ROUND_INTRO: next round
+    ROUND_RESULTS --> MATCH_END: someone reached the win target
+    MATCH_END --> [*]
+```
+
+| Phase | Default | Who can move / aim | What the player sees |
+|---|---|---|---|
+| Visible | 5 s (3–15) | move + aim | Everyone, with lasers |
+| Hide | 0.7 s | move + aim | Warning tone, flicker, `TARGETS HIDDEN` |
+| Reposition | 5 s (2–15) | move + aim | Only yourself (and ghosted teammates) |
+| Countdown | 5 s (3–15) | **locked** | `LOCKED` · `PLAYERS REVEALED IN 5…1` |
+| Freeze | 3 s | locked | Everyone revealed with locked lasers |
+| Shooting | ~0.85 s per shot | locked | `HIT!` / `MISS`, tracers, ragdolls |
+
+---
 
 ## Architecture
 
+The project is a TypeScript monorepo (npm workspaces) with three packages. The key idea is that **one simulation runs in two places**:
+
+```mermaid
+flowchart LR
+    subgraph shared["packages/shared (pure TypeScript, no DOM, no Node)"]
+        SIM["MatchSimulation<br/>fixed 30 Hz tick"]
+        MODE["BlindShotMode<br/>round state machine"]
+        SHOT["shotResolution<br/>analytic raycasts"]
+        VIS["visibility filter<br/>per-viewer views"]
+        BOT["BotBrain<br/>fair, memory-based bots"]
+        TYPES["types · events · constants"]
+        SIM --> MODE --> SHOT
+        SIM --> VIS
+        SIM --> BOT
+    end
+
+    subgraph client["apps/client (browser)"]
+        LOCAL["LocalSession<br/>(solo: sim in the tab)"]
+        NET["NetSession<br/>(online: Socket.IO)"]
+        CTRL["GameController<br/>prediction · interpolation · VFX"]
+        R3["Three.js world<br/>ArenaView · SubjectView · Effects"]
+        UI["React UI<br/>menus · HUD · results"]
+        LOCAL --> CTRL
+        NET --> CTRL
+        CTRL --> R3
+        CTRL --> UI
+    end
+
+    subgraph server["apps/server (Node)"]
+        ROOMS["RoomManager · Room<br/>codes · quick play · host · reconnect"]
+        RUN["MatchRunner<br/>30 Hz sim, 20 Hz snapshots"]
+        ROOMS --> RUN
+    end
+
+    LOCAL -. imports .-> SIM
+    RUN -. imports .-> SIM
+    NET <== "WebSocket (typed events)" ==> ROOMS
 ```
-apps/
-  client/            Vite + React + Three.js game client
-    src/game/        core (Engine, ClientWorld, GameController, Input), characters, weapons,
-                     maps, camera, effects, audio, physics, modes/blindShot (presenter)
-    src/networking/  GameSession interface, LocalSession (solo), NetSession + NetClient (online)
-    src/state/       settings + HUD stores
-    src/ui/          menus, lobby, HUD, results, settings, tutorial
-  server/            Node + Socket.IO authoritative server
-    src/rooms/       Room (lobby + match + host + reconnect), RoomManager (codes, quick play)
-    src/game/        MatchRunner (30 Hz sim, 20 Hz filtered snapshots)
-    src/networking/  typed handlers; src/players/ guest identities; src/validation/ rate limits
-packages/
-  shared/            Everything both sides agree on
-    src/types, events, constants, gameState (config sanitiser), math, arena
-    src/sim/         MatchSimulation, movement, visibility filter, shot resolution
-    src/modes/       GameMode interface + BlindShotMode (the round state machine)
-    src/bots/        BotBrain (fair, memory-based bots)
+
+- **`packages/shared`** holds everything both sides must agree on: types, event contracts, constants, arena geometry, movement, the round state machine, shot resolution, visibility rules and bots. It has no DOM or Node dependencies, so the exact same code is the authority on the server and in solo play.
+- **`apps/client`** is Vite + React + Three.js. The renderer only ever consumes a `MatchView` (what *this* player is allowed to see), so it can't tell whether that view came from a local simulation or the network.
+- **`apps/server`** is plain Node `http` + Socket.IO. It hosts rooms and runs one `MatchSimulation` per match. In production it also serves the built client, so the whole game is **one deployable service**.
+
+### Extensible game modes
+
+`MatchSimulation` hosts a `GameMode` (`initialize / startRound / update / endRound / cleanup / canMove / canAim / onPlayerRemoved / onPlayerFell`). `BlindShotMode` is the first implementation; future modes (Quick Draw, Double Shot, Ricochet…) plug in the same way.
+
+---
+
+## Netcode and the authoritative server
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client (browser)
+    participant S as Server (MatchRunner)
+    participant O as Other clients
+
+    loop every 33 ms while move/aim is allowed
+        C->>S: playerInput { seq, moveX, moveZ, sprint, yaw }
+        Note over C: predicts own movement locally<br/>(shared stepMovement)
+    end
+    loop 30 Hz
+        S->>S: consume one queued input per player per tick,<br/>tick MatchSimulation
+    end
+    loop 20 Hz
+        S-->>C: snapshot (filtered for C: hidden enemies omitted)
+        S-->>O: snapshot (filtered for each of them)
+        Note over C: reconcile: rewind to server pos,<br/>replay unacknowledged inputs
+    end
+    S-->>C: phaseChanged · shotFired · playerFell · roundEnded · matchEnded
 ```
 
-**One simulation, two hosts.** `MatchSimulation` is the same code in both places. For solo it runs inside the browser (`LocalSession`), and for online play it runs on the server (`MatchRunner`). The renderer only ever consumes a `MatchView`, so it cannot tell the two apart.
+- **Clients only send intent.** A client never says "I hit X". Inputs are validated (finite numbers, move vector clamped, yaw wrapped) and rate-limited, and the server applies **one queued input per tick**, so nobody can bank inputs to move faster.
+- **Hidden means not sent.** During `HIDE`, `REPOSITION` and `COUNTDOWN`, enemies are removed from each player's snapshot. There is no position, laser or shadow to peek at, not even in DevTools. Eliminated spectators are filtered the same way, so they can't call out positions. A fall that happens while hidden is announced without a position.
+- **Smoothness:** your own subject is predicted with the shared `stepMovement` and reconciled by replaying unacknowledged inputs. Other subjects are interpolated with a 100 ms buffer.
+- **Resilience:** session tokens let a dropped player reclaim their seat for 30 s, the host role transfers automatically, and a player who drops mid-round is removed safely. If only one side remains, the round finishes.
 
-**Modular game modes.** `GameMode` (`initialize / startRound / update / endRound / cleanup`) is the extension point. `BlindShotMode` is the first implementation, and future modes (Quick Draw, Double Shot, Ricochet…) can plug into `MatchSimulation` the same way.
+---
 
-**Explicit state machine.** Every phase transition lives in `BlindShotMode.advance()`. Nothing else changes the phase.
+## How shots are resolved
 
-## Multiplayer architecture
+When `COUNTDOWN` ends, the server enters `FREEZE`. From that moment no movement or aim input is applied, so every position and aim is locked on the server.
 
-* The **server is authoritative** for the round phase, timers, movement, alive state, shot resolution, score, victory and room state.
-* Clients send only **intent**: `playerInput { seq, moveX, moveZ, sprint, yaw }` at 30 Hz. A client never says "I hit X".
-* Every input is sanitised (finite numbers, move vector clamped, yaw wrapped) and rate-limited. The server queues them and applies **one input per tick**, so a client cannot bank inputs to move faster.
-* The server sends **per-player filtered snapshots** at 20 Hz. While enemies are hidden, their entries are **removed from the data**. Position, yaw, laser and shadow can't leak because the client never receives them. Eliminated spectators get the same filtering, so they can't call out positions over voice chat.
-* The local subject is predicted with the shared `stepMovement` and reconciled by replaying unacknowledged inputs. Remote subjects are interpolated with a 100 ms buffer.
-* **Reconnect:** a guest session token (per tab) lets a dropped player reclaim their seat for 30 s. If the host leaves, host transfers to the next player. A player who drops mid-round is removed from that round safely, and if only one side remains, the round finishes.
+```mermaid
+flowchart TD
+    A[FREEZE ends] --> B{fireOrder}
+    B -- SEQUENTIAL (default) --> C[Shuffle living subjects into a random order]
+    C --> D[Next shooter still alive?]
+    D -- no --> D2[skip: shot down before their turn]
+    D2 --> D
+    D -- yes --> E["Raycast from muzzle along locked aim<br/>vs walls, obstacles, living subjects"]
+    E --> F[Hit? eliminate target immediately]
+    F --> G{Only one side left?}
+    G -- yes --> H[REVEAL]
+    G -- no --> D
+    B -- SIMULTANEOUS --> I[Freeze one snapshot of everyone]
+    I --> J["Step 1: compute every shot (pure)"]
+    J --> K["Step 2: apply all eliminations at once<br/>(A and B can kill each other)"]
+    K --> H
+```
 
-## How the shots are resolved
-
-When the hidden countdown ends, the server enters **FREEZE**: movement and aim input stop being applied, so every subject's position and aim are locked on the server. Clients only ever sent intent, so nobody can change their aim after the lock.
-
-**One by one (default)** (`BlindShotMode.updateShooting()`):
-
-1. The living subjects are shuffled into a random firing order, so nobody is always first.
-2. Every 0.85 s the next subject fires: the server raycasts from their muzzle along their locked aim against the walls, obstacles and every subject still alive.
-3. A hit eliminates the target immediately. A subject who is eliminated before their turn never fires.
-4. Once only one side is left, the remaining turns are skipped.
-
-**All at once (host option)** (`BlindShotMode.fireSimultaneous()`):
-
-1. Compute every shot from one frozen snapshot (pure, changes nothing).
-2. Apply all eliminations together. A and B can kill each other, and shooter order never matters (there is a unit test for this). If everyone dies at once, the round is a draw.
-
-The server owns the timing, so latency never decides who shoots first. Each shot is broadcast as a `shotFired` event, and clients play the flash, tracer, sound and ragdoll for it.
+Hit tests are **analytic 2D raycasts** (ray vs circle and ray vs box on the XZ plane) in the shared package, so they give identical results on client and server, with no physics engine needed on the server. The laser sight uses the very same raycast: if a laser touches you, that shot would hit you.
 
 Scoring: hit +100, elimination +100, survived volley +50, round win +200.
 
-## Local setup
+---
+
+## Bots
+
+Bots are honest. A `BotBrain` only reads the **same filtered view a human in its seat would get**, so hidden players are invisible to bots too. Each bot remembers last-seen positions and velocities, picks targets with weighted choices (proximity, "is aiming at me", line of sight), commits to a prediction when the lights go out, and sometimes repositions while hidden.
+
+| | Easy | Normal | Hard |
+|---|---|---|---|
+| Reaction time | 0.6–1.1 s | 0.3–0.6 s | 0.15–0.3 s |
+| Memory noise | 0.6 m | 0.25 m | 0.1 m |
+| Aim error | ±3° | ±1.4° | ±0.7° |
+| Wrong-target chance | 30 % | 10 % | 3 % |
+| Predicts movement | no | partly | yes, and guesses dodges |
+
+`npx tsx packages/shared/src/tests/balance.ts` prints hit rates and round lengths per difficulty.
+
+---
+
+## Rendering, physics and audio
+
+- **Rendering:** Three.js with toon materials, inverted-hull ink outlines, pooled VFX (one draw call per particle system) and a fixed light count, so firing never triggers a shader recompile. All models and textures are built in code (Canvas 2D textures, procedural meshes).
+- **Camera:** an auto-fit camera. It binary-searches the distance at which every arena corner projects inside the frame, for any window shape, then applies the player's zoom, orbit and tilt on top.
+- **Physics:** [Rapier](https://rapier.rs) (WASM) runs on the client only, for ragdolls and flying guns. Gameplay never depends on it.
+- **Audio:** real CC0 gunshot recordings, trimmed, bass-boosted and soft-limited for punch, plus Web Audio synthesis for UI clicks, countdown beeps, the lights-off clunk, heartbeat and ambience.
+
+---
+
+## Project structure
+
+```
+blind-shot/
+├─ apps/
+│  ├─ client/                     Vite + React + Three.js game client
+│  │  ├─ public/sfx/              CC0 gunshot samples (+ LICENSE.txt)
+│  │  └─ src/
+│  │     ├─ game/
+│  │     │  ├─ core/              Engine, ClientWorld, GameController, Input, MenuDirector
+│  │     │  ├─ characters/        SubjectModel (toon), blockyLooks (blocky cast), SubjectView, Ragdoll
+│  │     │  ├─ maps/              ArenaView (4 themes), procedural textures
+│  │     │  ├─ camera/            CameraRig (auto-fit, free look)
+│  │     │  ├─ weapons/           GunModel, LaserSight
+│  │     │  ├─ effects/           Effects (flash, tracers, decals), Particles
+│  │     │  ├─ audio/             AudioEngine (samples + synthesis)
+│  │     │  ├─ physics/           PhysicsWorld (Rapier)
+│  │     │  └─ modes/blindShot/   BlindShotPresenter (banners, lighting, popups)
+│  │     ├─ networking/           GameSession, LocalSession, NetSession, NetClient
+│  │     ├─ state/                tiny stores: settings, HUD
+│  │     └─ ui/                   React screens: menu, solo setup, lobby, HUD, results
+│  └─ server/                     Node + Socket.IO authoritative server
+│     └─ src/
+│        ├─ rooms/                Room (lobby, host, reconnect), RoomManager (codes, quick play)
+│        ├─ game/                 MatchRunner (30 Hz tick, 20 Hz filtered snapshots)
+│        ├─ networking/           typed event handlers
+│        ├─ players/              guest identities + session tokens
+│        ├─ validation/           rate limiter
+│        └─ tests/smoke.ts        end-to-end multiplayer test
+├─ packages/
+│  └─ shared/                     Everything client and server agree on
+│     └─ src/
+│        ├─ sim/                  MatchSimulation, movement, shotResolution, visibility
+│        ├─ modes/                GameMode interface, BlindShotMode state machine
+│        ├─ arena/                maps, raycasts, spawns, shrinking
+│        ├─ bots/                 BotBrain
+│        ├─ types/ events/ constants/ gameState/ math/ util/
+│        └─ tests/                simulation tests + balance report
+├─ docs/screenshots/              README images
+├─ Dockerfile · render.yaml       single-service deploy
+└─ .env.example
+```
+
+---
+
+## Getting started
 
 Requires **Node 20+**.
 
 ```bash
+git clone https://github.com/SHJony121/blind-shot.git
+cd blind-shot
 npm install
-npm run dev          # server on :3001 + client on :5173 together
+npm run dev          # game server on :3001 + client on :5173
 ```
 
-Open <http://localhost:5173>. Solo works even if the server is not running.
+Open <http://localhost:5173>. Solo works even without the server.
 
-Other scripts:
+| Script | What it does |
+|---|---|
+| `npm run dev` | Client + server together, with hot reload |
+| `npm run dev:client` / `npm run dev:server` | Run one side only |
+| `npm run build` | Production build (`apps/client/dist` + `apps/server/dist`) |
+| `npm start` | Serve the built game **and** the Socket.IO server on `$PORT` |
+| `npm run typecheck` | Strict TypeScript across all packages |
+| `npm test` | Simulation tests |
 
-```bash
-npm run dev:client   # client only (solo play)
-npm run dev:server   # server only
-npm run typecheck    # strict TS across all packages
-npm test             # shared simulation tests (mutual kills, order-independence, visibility…)
-npm run smoke -w @blindshot/server   # end-to-end multiplayer test against a running server
-npx tsx packages/shared/src/tests/balance.ts   # bot hit-rate / round-length report
-```
-
-## Environment variables
+### Environment variables
 
 See [`.env.example`](.env.example).
 
-| Variable | Where | Default | Meaning |
+| Variable | Side | Default | Purpose |
 |---|---|---|---|
-| `PORT` | server | `3001` | Port to listen on (set automatically by most hosts) |
-| `BLINDSHOT_PORT` | server | — | Overrides `PORT` (handy when tooling sets `PORT` for the client) |
-| `CORS_ORIGIN` | server | `*` | Comma-separated allowed origins when the client is hosted elsewhere |
-| `CLIENT_DIST` | server | `apps/client/dist` | Built client to serve from the same process |
-| `VITE_SERVER_URL` | client (build time) | same origin (prod) / `:3001` (dev) | Where the client connects for online play |
+| `PORT` | server | `3001` | Listen port (set by most hosts) |
+| `BLINDSHOT_PORT` | server | (unset) | Overrides `PORT` |
+| `CORS_ORIGIN` | server | `*` | Allowed origins when the client is hosted elsewhere |
+| `CLIENT_DIST` | server | `apps/client/dist` | Built client to serve |
+| `VITE_SERVER_URL` | client (build) | same origin | Game server URL for split deployments |
 
-## Production build
+---
+
+## Testing
 
 ```bash
-npm install
-npm run build        # builds apps/client/dist and apps/server/dist
-npm start            # serves the game AND the Socket.IO server on $PORT
+npm test                                   # shared simulation tests
+npm run smoke -w @blindshot/server         # multiplayer end-to-end (needs a running server)
+npx tsx packages/shared/src/tests/balance.ts
 ```
+
+The simulation tests cover:
+
+- simultaneous mutual kills, and shot order not changing the outcome
+- obstacles and friendly fire
+- hidden enemies being absent from snapshots
+- sequential turns: a subject shot first never fires
+- falling off a floating platform
+- the arena shrinking within a round and resetting each round
+- movement and aim locking during the countdown
+- full matches always terminating with exactly one `matchEnded`
+
+The smoke test runs two real Socket.IO clients through a match and asserts that **no hidden enemy ever appears in a snapshot**.
+
+---
 
 ## Deployment
 
-**Option A, one service (simplest).** Deploy the whole repo to any WebSocket-friendly Node host (Railway, Render, Fly.io). The server serves the built client, so no CORS or extra configuration is needed.
+The server serves the built client, so the whole game deploys as **one WebSocket-capable Node service**.
 
-* Build command: `npm install && npm run build`
-* Start command: `npm start`
-* A [`render.yaml`](render.yaml) blueprint and a [`Dockerfile`](Dockerfile) (for Fly.io / Railway / anything Docker) are included.
+**Render (free tier, recommended)**
+1. Sign in at [render.com](https://render.com) and connect your GitHub account.
+2. **New → Blueprint** and pick this repository. [`render.yaml`](render.yaml) configures everything (`npm install && npm run build`, `npm start`, health check `/health`).
+3. Open the `*.onrender.com` URL. That's the game.
 
-**Option B, static client plus game server.**
+**Any Docker host (Fly.io, Railway, …):** use the included [`Dockerfile`](Dockerfile), which exposes `$PORT` (default 3001).
 
-1. Deploy the server (Railway / Render / Fly.io) with `npm run build -w @blindshot/server` and `npm start`, and set `CORS_ORIGIN=https://your-client.example`.
-2. Deploy `apps/client` to Vercel, Netlify or Cloudflare Pages with build command `npm run build -w @blindshot/client`, output `apps/client/dist`, and env `VITE_SERVER_URL=https://your-server.example`.
+**Split hosting:** deploy `apps/client/dist` to Vercel, Netlify or Cloudflare Pages with `VITE_SERVER_URL=https://your-server`, and run the server anywhere with `CORS_ORIGIN=https://your-client`.
+
+---
+
+## Controls
+
+| Input | Action |
+|---|---|
+| Mouse | Aim (your subject turns to face the cursor) |
+| WASD / arrows | Move (while visible and during the hidden move time) |
+| Shift | Sprint |
+| Mouse wheel | Zoom in (toward the cursor) and out, any time |
+| Click + drag (any button) | Turn the camera; your aim holds still while you drag |
+| C | Reset the camera |
+| Tab | Scoreboard |
+| Esc | Pause / menu |
+
+There is no fire button. Your one shot goes off automatically after the freeze, wherever you were aiming when the lock hit.
+
+---
+
+## Codebase at a glance
+
+| Package | TypeScript / TSX | Other |
+|---|---|---|
+| `apps/client` | ~6,650 lines | ~1,350 lines of CSS |
+| `packages/shared` | ~2,350 lines | |
+| `apps/server` | ~820 lines | |
+| **Total** | **~9,800 lines of strict TypeScript** | ~11,800 tracked lines overall |
+
+Strict TypeScript everywhere (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`), typed Socket.IO event maps, and no `any` in game code.
+
+---
 
 ## Roadmap
 
-Done in v0.1: the solo MVP (bots, best-of-5, ragdolls, VFX, audio, HUD, results, settings, tutorial), online rooms with quick play, reconnect and host transfer, and team mode.
+- [ ] A 2–4 s replay after each volley (true positions, aim lines, hits)
+- [ ] Touch controls (left stick move, right stick aim; firing is already automatic)
+- [ ] Style points (Double Kill, Longest Shot, No-Move Kill, Mutual Elimination)
+- [ ] Pre-shootout emotes
+- [ ] More modes behind the `GameMode` interface (Quick Draw, Double Shot, Ricochet)
+- [ ] Cosmetics (outfits, gun skins), never pay-to-win
 
-Next:
+---
 
-* [ ] TODO: 2–4 s **replay** after each shootout (true positions, aim lines, hits)
-* [ ] TODO: touch controls (left stick move, right stick aim; firing is already automatic)
-* [ ] TODO: style points (Double Kill, Longest Shot, No-Move Kill, Mutual Elimination)
-* [ ] TODO: pre-shootout emotes (wave, point, shrug)
-* [ ] TODO: more arenas (Factory Floor, Cargo Platform, Cooling Room…) behind the existing `ArenaDef` / `MapId`
-* [ ] TODO: more modes behind the `GameMode` interface (Quick Draw, Double Shot, Moving Target, Ricochet)
-* [ ] TODO: cosmetic jumpsuits, helmets and gun skins (no pay-to-win)
-* [ ] TODO: optional stylised gore toggle
+## Credits
 
-## Asset credits
+All models, textures, maps and effects are **original and generated in code**. Nothing is copied from another game.
 
-Every model, texture and visual effect is **original and generated in code**, and all sounds are either synthesised or CC0 recordings. Nothing is copied from another game.
-
-* **3D models:** procedural (`SubjectModel`, `GunModel`, `TestChamber`) built from Three.js primitives.
-* **Textures:** drawn at runtime with Canvas 2D (`characters/textures.ts`, `maps/arenaTextures.ts`).
-* **Gunshots:** real recordings from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library) (CC0 1.0, public domain): single shots from the 1911 (takes A_42P, A_34P) and Smith & Wesson 642 (take V_22P), trimmed, mono, 44.1 kHz. Stored in `apps/client/public/sfx/` with a `LICENSE.txt`. The synthesized shot is only a fallback if the files fail to load.
-* **Other audio:** synthesised at runtime with the Web Audio API (`audio/AudioEngine.ts`).
-* **Fonts:** [Anton](https://fonts.google.com/specimen/Anton) by Vernon Adams and [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) by Jeremy Tribby, both under the SIL Open Font License 1.1, bundled via `@fontsource`.
-* **Libraries:** Three.js (MIT), Rapier (Apache-2.0), React (MIT), Socket.IO (MIT), Vite (MIT).
+- **Gunshots:** single shots (1911 takes A_42P and A_34P, Smith & Wesson 642 take V_22P) from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library), **CC0 1.0** (public domain). They were trimmed, mixed to mono, bass-boosted and soft-limited; see `apps/client/public/sfx/LICENSE.txt`.
+- **Other sounds:** synthesised at runtime with the Web Audio API.
+- **Fonts:** [Anton](https://fonts.google.com/specimen/Anton) and [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed), SIL Open Font License 1.1, via `@fontsource`.
+- **Libraries:** Three.js (MIT), Rapier (Apache-2.0), React (MIT), Socket.IO (MIT), Vite (MIT).
