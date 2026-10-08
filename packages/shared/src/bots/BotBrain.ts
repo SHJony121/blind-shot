@@ -115,7 +115,7 @@ export class BotBrain {
     const enemies = view.bodies.filter((b) => b.alive && this.isEnemy(b.id, view) && b.visibility === 'full');
     for (const e of enemies) this.observe(e, view.time);
 
-    const hidden = view.phase === 'HIDE' || view.phase === 'COUNTDOWN';
+    const hidden = view.phase === 'HIDE' || view.phase === 'REPOSITION' || view.phase === 'COUNTDOWN';
     if (hidden && !this.wasHidden) this.onTargetsHidden(me, view);
     this.wasHidden = hidden;
 

@@ -219,9 +219,12 @@ export function Lobby() {
                 <Field label="ROUNDS TO WIN">
                   <Seg value={cfg.roundsToWin} options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: String(n) }))} onChange={(roundsToWin) => set({ roundsToWin })} />
                 </Field>
-                <Field label="VISIBLE / HIDDEN">
+                <Field label="VISIBLE">
+                  <Slider value={cfg.visibleSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
+                </Field>
+                <Field label="HIDDEN: MOVE / LOCKED">
                   <div className="row">
-                    <Slider value={cfg.visibleSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(visibleSeconds) => set({ visibleSeconds })} />
+                    <Slider value={cfg.repositionSeconds} min={2} max={15} step={1} format={(v) => `${v}S`} onChange={(repositionSeconds) => set({ repositionSeconds })} />
                     <Slider value={cfg.blindSeconds} min={3} max={15} step={1} format={(v) => `${v}S`} onChange={(blindSeconds) => set({ blindSeconds })} />
                   </div>
                 </Field>
@@ -259,7 +262,7 @@ export function Lobby() {
                 <br />
                 ROUNDS TO WIN: {cfg.roundsToWin}
                 <br />
-                VISIBLE {cfg.visibleSeconds}S · BLIND {cfg.blindSeconds}S
+                VISIBLE {cfg.visibleSeconds}S · HIDDEN MOVE {cfg.repositionSeconds}S · LOCKED {cfg.blindSeconds}S
                 <br />
                 SHOTS: {cfg.fireOrder === 'SEQUENTIAL' ? 'ONE BY ONE' : 'ALL AT ONCE'} · FRIENDLY FIRE: {cfg.friendlyFire ? 'ON' : 'OFF'}
                 <br />

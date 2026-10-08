@@ -7,6 +7,7 @@ export type Phase =
   | 'SPAWN'
   | 'VISIBLE'
   | 'HIDE'
+  | 'REPOSITION'
   | 'COUNTDOWN'
   | 'FREEZE'
   | 'SHOOTING'
@@ -15,11 +16,11 @@ export type Phase =
   | 'MATCH_END';
 
 /** Phases during which enemies are hidden from every viewer. */
-export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'COUNTDOWN']);
+export const HIDDEN_PHASES: ReadonlySet<Phase> = new Set<Phase>(['HIDE', 'REPOSITION', 'COUNTDOWN']);
 /** Phases during which subjects can rotate / aim. FREEZE and SHOOTING lock every aim. */
-export const AIM_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'COUNTDOWN']);
-/** Phases during which subjects can move. */
-export const MOVE_PHASES: ReadonlySet<Phase> = AIM_PHASES;
+export const AIM_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'REPOSITION', 'COUNTDOWN']);
+/** Phases during which subjects can move. The hidden countdown locks positions (aim still free). */
+export const MOVE_PHASES: ReadonlySet<Phase> = new Set<Phase>(['VISIBLE', 'HIDE', 'REPOSITION']);
 
 export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export type GameModeId = 'FFA' | 'TEAMS';
@@ -34,6 +35,9 @@ export interface MatchConfig {
   maxPlayers: number;
   roundsToWin: number;
   visibleSeconds: number;
+  /** While hidden: seconds everyone can still move to a new spot. */
+  repositionSeconds: number;
+  /** While hidden: the "players revealed in N" countdown, with positions locked. */
   blindSeconds: number;
   fireOrder: FireOrder;
   friendlyFire: boolean;

@@ -26,7 +26,8 @@ Every subject in the test chamber holds a gun with a laser sight. For a few seco
 | **Spawn** | Subjects drop in at random spots anywhere on the floor |
 | **Visible (5 s, up to 15 s)** | Everyone is visible with laser sights. Move, aim, read who is aiming at you, and memorise |
 | **Hide** | Warning tone, the lights flicker, and enemies vanish (`TARGETS HIDDEN`) |
-| **Countdown (5 s, up to 15 s)** | Enemies are truly gone. You can still move and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
+| **Hidden: move (5 s, 2–15 s)** | Enemies are truly gone. Everyone can still move to a new spot and aim. Popup: `MOVE · POSITIONS LOCK IN 5…1` |
+| **Hidden: locked countdown (5 s, up to 15 s)** | `POSITIONS LOCKED`: nobody can move any more, but you can still turn and aim. Popup: `PLAYERS REVEALED IN 5 · 4 · 3 · 2 · 1` |
 | **Freeze (3 s)** | Everyone reappears where they really are. Nobody can move, and every aim is locked (`FREEZE!`). Scroll and drag to inspect the lasers |
 | **Shooting** | Subjects fire **one at a time** in a random order. A subject who gets shot before their turn never fires |
 | **Reveal** | `HIT!`, `MISS`, `EVERYBODY MISSED`, `2 SURVIVORS`… |
@@ -69,7 +70,7 @@ In TEAMS mode the blocky characters wear their team colour as their shirt.
 | Input | Action |
 |---|---|
 | Mouse | Aim. Your subject turns to face the cursor |
-| WASD / arrows | Move anywhere on the floor (while visible and while hidden; never during the freeze) |
+| WASD / arrows | Move anywhere on the floor (while visible and during the hidden move time; never during the locked countdown or the freeze) |
 | Shift | Sprint |
 | Tab | Scoreboard |
 | Mouse wheel | Zoom in (toward the cursor) and out, at any time |

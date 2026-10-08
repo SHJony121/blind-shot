@@ -54,12 +54,17 @@ export class BlindShotPresenter {
         c.flicker(0.45);
         c.setMood('blind');
         c.setDisplay('BLIND', 'VISUAL FEED DISABLED', '#ff4b3a');
-        showBanner('TARGETS HIDDEN', { subtitle: 'MOVE. AIM. REMEMBER WHERE THEY WERE.', tone: 'danger', size: 'lg' });
+        showBanner('TARGETS HIDDEN', { subtitle: 'MOVE TO A NEW SPOT. REMEMBER WHERE THEY WERE.', tone: 'danger', size: 'lg' });
         this.heartbeatIn = 0.4;
+        break;
+      case 'REPOSITION':
+        this.lastCountdown = 0;
         break;
       case 'COUNTDOWN':
         this.lastCountdown = 0;
         c.setMood('alert');
+        audio.freeze();
+        showBanner('POSITIONS LOCKED', { subtitle: 'NOBODY CAN MOVE · KEEP AIMING', tone: 'danger', size: 'md' });
         break;
       case 'FREEZE':
         hudStore.set({ popup: null, countdown: null });
@@ -116,11 +121,19 @@ export class BlindShotPresenter {
       audio.warning();
       c.flicker(0.12);
     }
-    if (phase === 'HIDE' || phase === 'COUNTDOWN') {
+    if (phase === 'HIDE' || phase === 'REPOSITION' || phase === 'COUNTDOWN') {
       this.heartbeatIn -= dt;
       if (this.heartbeatIn <= 0) {
         audio.heartbeat();
         this.heartbeatIn = phase === 'COUNTDOWN' && timeLeft < 2.5 ? 0.5 : 0.8;
+      }
+    }
+    if (phase === 'REPOSITION') {
+      const n = Math.max(1, Math.ceil(timeLeft - 1e-3));
+      if (n !== this.lastCountdown) {
+        this.lastCountdown = n;
+        c.setDisplay(`MOVE ${n}`, 'POSITIONS LOCK SOON', '#ff4b3a');
+        hudStore.set({ popup: { id: Date.now(), title: 'MOVE · POSITIONS LOCK IN', value: String(n) } });
       }
     }
     if (phase === 'COUNTDOWN') {

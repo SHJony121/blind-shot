@@ -30,8 +30,8 @@ export function Hud({ actions }: { actions: HudActions }) {
   const teams = h.config?.mode === 'TEAMS';
   const roster = [...h.roster].sort((a, b) => a.subject - b.subject);
   const need = h.config?.roundsToWin ?? 3;
-  const hiddenPhase = h.phase === 'HIDE' || h.phase === 'COUNTDOWN';
-  const barPhases = h.phase === 'VISIBLE' || h.phase === 'COUNTDOWN';
+  const hiddenPhase = h.phase === 'HIDE' || h.phase === 'REPOSITION' || h.phase === 'COUNTDOWN';
+  const barPhases = h.phase === 'VISIBLE' || h.phase === 'REPOSITION' || h.phase === 'COUNTDOWN';
 
   return (
     <div className="overlay">
@@ -85,7 +85,7 @@ export function Hud({ actions }: { actions: HudActions }) {
         </div>
       ) : null}
 
-      {h.popup && h.phase === 'COUNTDOWN' && !h.paused ? (
+      {h.popup && (h.phase === 'REPOSITION' || h.phase === 'COUNTDOWN') && !h.paused ? (
         <div className="popup-wrap">
           <div className="popup">
             <div className="popup-title">{h.popup.title}</div>

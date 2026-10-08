@@ -201,6 +201,34 @@ test('arena shrinks within a round and resets to full size each new round', () =
   assert(shrunk && checkedReset, 'expected a shrink and a later round reset');
 });
 
+test('hidden phase: free to move, then positions lock for the countdown', () => {
+  const sim = new MatchSimulation(
+    { ...DEFAULT_MATCH_CONFIG, mapId: 'TEST_CHAMBER_01' },
+    [
+      { id: 'h', name: 'Human', isBot: false },
+      { id: 'b1', name: 'Bot1', isBot: true },
+    ],
+    3,
+  );
+  sim.start();
+  const me = sim.players.get('h')!;
+  let seq = 0;
+  const stepAndMeasure = (phase: string): number => {
+    while (sim.phase !== phase) {
+      sim.queueInput('h', { seq: ++seq, moveX: 0, moveZ: 0, sprint: false, yaw: 0 });
+      sim.tick(1 / 30);
+    }
+    const before = { ...me.pos };
+    for (let i = 0; i < 10; i++) {
+      sim.queueInput('h', { seq: ++seq, moveX: i % 2 ? 1 : -1, moveZ: 0.3, sprint: false, yaw: 0 });
+      sim.tick(1 / 30);
+    }
+    return Math.hypot(me.pos.x - before.x, me.pos.z - before.z);
+  };
+  assert(stepAndMeasure('REPOSITION') > 0.05, 'should move during REPOSITION');
+  assert(stepAndMeasure('COUNTDOWN') < 1e-6, 'must not move during the locked COUNTDOWN');
+});
+
 test('names and room codes are sanitised', () => {
   assert(sanitizeName('<script>alert(1)</script>') === 'scriptalert1sc', 'strips markup');
   assert(sanitizeName('   ') === 'Guest', 'falls back');

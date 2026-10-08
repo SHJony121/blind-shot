@@ -16,7 +16,7 @@ import { AIM_PHASES, HIDDEN_PHASES, MOVE_PHASES, type Phase, type ShotResult, ty
 import type { GameMode, ModeContext } from '../GameMode';
 
 /** Phases where a disconnect can end the round early. */
-const INTERRUPTIBLE: ReadonlySet<Phase> = new Set<Phase>(['ROUND_INTRO', 'SPAWN', 'VISIBLE', 'HIDE', 'COUNTDOWN', 'FREEZE']);
+const INTERRUPTIBLE: ReadonlySet<Phase> = new Set<Phase>(['ROUND_INTRO', 'SPAWN', 'VISIBLE', 'HIDE', 'REPOSITION', 'COUNTDOWN', 'FREEZE']);
 
 /**
  * BLIND SHOT — the explicit round state machine. Every phase transition in the game
@@ -173,6 +173,8 @@ export class BlindShotMode implements GameMode {
       case 'VISIBLE':
         return this.enter('HIDE', PHASE_DURATIONS.HIDE);
       case 'HIDE':
+        return this.enter('REPOSITION', config.repositionSeconds);
+      case 'REPOSITION':
         return this.enter('COUNTDOWN', config.blindSeconds);
       case 'COUNTDOWN':
         return this.enter('FREEZE', PHASE_DURATIONS.FREEZE);

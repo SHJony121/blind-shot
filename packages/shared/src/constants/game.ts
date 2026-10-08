@@ -38,6 +38,9 @@ export const SIMULTANEOUS_SHOOTING_TIME = 1.6;
 
 export const DEFAULT_VISIBLE_SECONDS = 5;
 export const DEFAULT_BLIND_SECONDS = 5;
+export const DEFAULT_REPOSITION_SECONDS = 5;
+export const MIN_REPOSITION_SECONDS = 2;
+export const MAX_REPOSITION_SECONDS = 15;
 export const MIN_VISIBLE_SECONDS = 2;
 export const MAX_VISIBLE_SECONDS = 15;
 export const MIN_BLIND_SECONDS = 3;
