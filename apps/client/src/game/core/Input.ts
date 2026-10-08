@@ -27,8 +27,14 @@ export class Input {
   private readonly releaseListeners = new Set<Listener>();
   private enabled = true;
   private dragButton = -1;
-  /** Left-button drag orbits the camera only when aiming is locked (it would fight the cursor otherwise). */
-  leftDragOrbits = false;
+  private dragDistance = 0;
+  /** Left-button drag orbits the camera too (aim holds still while you drag). */
+  leftDragOrbits = true;
+
+  /** True while the mouse is being dragged to turn the camera: cursor aiming pauses meanwhile. */
+  get cameraDragActive(): boolean {
+    return this.dragButton !== -1 && this.dragDistance > 4;
+  }
 
   constructor(private readonly element: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown);
@@ -56,10 +62,12 @@ export class Input {
 
   private onPointerDown = (e: PointerEvent): void => {
     this.dragButton = e.button;
+    this.dragDistance = 0;
   };
 
   private onPointerUp = (): void => {
     this.dragButton = -1;
+    this.dragDistance = 0;
   };
 
   setEnabled(enabled: boolean): void {
@@ -130,6 +138,7 @@ export class Input {
     if (document.pointerLockElement === this.element) this.state.turnDelta += e.movementX;
     // Right / middle drag always orbits; left drag only when aims are locked.
     else if (this.dragButton === 1 || this.dragButton === 2 || (this.dragButton === 0 && this.leftDragOrbits)) {
+      this.dragDistance += Math.abs(e.movementX) + Math.abs(e.movementY);
       this.state.dragX += e.movementX;
       this.state.dragY += e.movementY;
     }

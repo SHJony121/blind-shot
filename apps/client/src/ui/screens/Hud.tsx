@@ -103,7 +103,7 @@ export function Hud({ actions }: { actions: HudActions }) {
 
       {!h.matchResult && !h.paused ? (
         <div className="inspect-hint">
-          SCROLL ZOOM · RIGHT-DRAG LOOK{h.phase === 'FREEZE' || h.phase === 'SHOOTING' || h.phase === 'REVEAL' ? ' (LEFT-DRAG TOO)' : ''} · C RESET VIEW
+          SCROLL ZOOM · DRAG TO TURN VIEW · C RESET VIEW
         </div>
       ) : null}
 

@@ -126,7 +126,6 @@ export class GameController {
     this.world.input.setEnabled(true);
     this.world.cameraRig.mode = 'menu';
     Object.assign(this.world.cameraRig.inspect, { enabled: false, zoom: 1, yaw: 0, pitch: 0, focus: null });
-    this.world.input.leftDragOrbits = false;
     this.world.cameraTarget = () => ({ subject: null, aim: null });
     this.world.setArena('WHITE_ROOM');
     this.world.chamber.setMood('menu');
@@ -258,7 +257,7 @@ export class GameController {
     if (rounded !== hudStore.get().timeLeft) hudStore.set({ timeLeft: rounded });
 
     this.sampleLocalInput(dt, view);
-    this.updateInspect(view);
+    this.updateInspect();
 
     const renderTime = view.time + sincePacket - this.session.interpolationDelay;
     const localId = this.session.localId;
@@ -300,11 +299,10 @@ export class GameController {
     }
   }
 
-  /** Free camera at any time: scroll to zoom toward the cursor, right-drag to orbit (left-drag too when aims are locked). */
-  private updateInspect(view: MatchView): void {
+  /** Free camera at any time: scroll to zoom toward the cursor, drag (any button) to orbit. */
+  private updateInspect(): void {
     const rig = this.world.cameraRig;
     const cam = this.world.input.consumeCamera();
-    this.world.input.leftDragOrbits = !this.localAlive || !AIM_PHASES.has(view.phase);
     if (this.paused) return;
     rig.inspect.enabled = true;
     if (cam.wheel !== 0) {
@@ -334,7 +332,8 @@ export class GameController {
         this.aimYaw = wrapAngle(this.aimYaw - input.consumeTurn() * 0.0025 * settings.mouseSensitivity);
         const d = { x: Math.sin(this.aimYaw), z: Math.cos(this.aimYaw) };
         this.aimPoint = { x: me.x + d.x * 6, z: me.z + d.z * 6 };
-      } else {
+      } else if (!input.cameraDragActive) {
+        // Cursor aim (paused while the mouse is dragged to turn the camera).
         ndc.set(input.state.pointerX, input.state.pointerY);
         raycaster.setFromCamera(ndc, this.world.engine.camera);
         const hit = raycaster.ray.intersectPlane(aimPlane, v3);

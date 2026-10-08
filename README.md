@@ -74,7 +74,7 @@ In TEAMS mode the blocky characters wear their team colour as their shirt.
 | Shift | Sprint |
 | Tab | Scoreboard |
 | Mouse wheel | Zoom in (toward the cursor) and out, at any time |
-| Right-drag (also left-drag once aims are locked) | Look around freely: orbit the camera, tilt down low to see the sky |
+| Click + drag (any mouse button, any time) | Turn the view freely: orbit the camera, tilt down low to see the sky. Your aim holds still while you drag |
 | C | Reset the camera view |
 | Esc | Pause / menu |
 
