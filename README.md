@@ -17,7 +17,10 @@ Memorise where everyone is, watch them vanish, move, lock in your aim, and find 
 
 <img src="docs/screenshots/visible.jpg" alt="Six subjects on the floating White Room, lasers showing who is aiming at whom" width="860">
 
+### [▶ Play now: blind-shot.onrender.com](https://blind-shot.onrender.com)
+
 **Open the link, type a name, play.** No install, no launcher, no account.
+<sub>Free hosting: the first visit after a quiet spell can take ~30–50 s while the server wakes up.</sub>
 
 </div>
 
@@ -382,6 +385,8 @@ The smoke test runs two real Socket.IO clients through a match and asserts that 
 ## Deployment
 
 The server serves the built client, so the whole game deploys as **one WebSocket-capable Node service**.
+
+The live demo at **https://blind-shot.onrender.com** runs exactly this setup on Render's free tier, and every push to `main` redeploys it.
 
 **Render (free tier, recommended)**
 1. Sign in at [render.com](https://render.com) and connect your GitHub account.
